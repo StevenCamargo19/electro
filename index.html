@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Electrocardiogramas</title>
+  <link rel="shortcut icon" href="img/icon.png" type="image/x-icon">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+
+  <!-- ── LOADING OVERLAY ── -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <p class="loading-text">Cargando...</p>
+  </div>
+
+  <!-- ── TOAST CONTAINER ── -->
+  <div id="toast-container"></div>
+
+  <!-- ══════════════════════════════════════════════
+     PANTALLA: LOGIN
+══════════════════════════════════════════════ -->
+  <div id="screen-login" class="screen active">
+
+    <!-- Canvas ECG animado -->
+    <canvas id="ecg-canvas"></canvas>
+
+    <div class="login-card">
+
+      <!-- LOGO -->
+      <div class="login-logo-wrap">
+        <img src="img/logo.png" alt="Logo" class="login-logo-img"
+          onerror="this.style.display='none'; document.getElementById('login-logo-fallback').style.display='block'">
+        <div id="login-logo-fallback" class="login-logo-fallback" style="display:none">
+          Grupo Previsalud
+        </div>
+      </div>
+
+      <h2 class="login-title">Bienvenido</h2>
+
+      <div class="field-group">
+        <label class="field-label" for="login-user">Usuario</label>
+        <input class="field-input" type="text" id="login-user" placeholder="Ingrese usuario" autocomplete="username">
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="login-pass">Contraseña</label>
+        <input class="field-input" type="password" id="login-pass" placeholder="Ingrese contraseña"
+          autocomplete="current-password">
+      </div>
+
+      <button class="btn-login" onclick="doLogin()">Ingresar</button>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+     PANTALLA: APP
+══════════════════════════════════════════════ -->
+  <div id="screen-app" class="screen">
+
+    <!-- NAVBAR -->
+    <header class="navbar">
+      <div class="navbar-center">
+        <div class="navbar-left">
+          <!-- LOGO NAVBAR -->
+          <img src="img/logo.png" alt="Logo" class="navbar-logo-img"
+            onerror="this.style.display='none'; document.getElementById('navbar-logo-fallback').style.display='block'">
+          <span id="navbar-logo-fallback" class="navbar-logo-fallback" style="display:none">
+            Grupo Previsalud
+          </span>
+        </div>
+        <div class="navbar-right">
+          <div class="user-badge">
+            <div class="user-avatar" id="user-avatar"></div>
+            <div class="user-info">
+              <span class="user-name" id="user-name-display"></span>
+              <span class="user-rol" id="user-rol-display"></span>
+            </div>
+          </div>
+          <button class="btn-logout" onclick="doLogout()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Salir
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- MAIN -->
+    <main class="app-main">
+
+      <!-- ── VISTA ENFERMERO ── -->
+      <div id="view-enfermero" style="display:none">
+
+        <div class="tab-bar">
+          <button class="tab-btn active" id="tab-btn-upload" onclick="showTab('upload', this)">
+            ↑ Subir Electro
+          </button>
+          <button class="tab-btn" id="tab-btn-records" onclick="showTab('my-records', this)">
+            ☰ Mis Registros
+          </button>
+        </div>
+
+        <!-- Panel: Subir -->
+        <div id="panel-upload" class="panel active">
+          <h3 class="section-title">Subir Electrocardiograma</h3>
+          <p class="section-desc">Registre el electro del paciente con su información correspondiente.</p>
+
+          <div class="form-card">
+            <div class="form-grid">
+              <div class="form-field">
+                <label class="form-label" for="up-cedula">Cédula del Paciente *</label>
+                <input class="form-input" type="text" id="up-cedula" placeholder="Ej: 1234567890">
+              </div>
+              <div class="form-field">
+                <label class="form-label" for="up-nombre">Nombre Completo *</label>
+                <input class="form-input" type="text" id="up-nombre" placeholder="Nombre del paciente">
+              </div>
+              <div class="form-field full">
+                <label class="form-label" for="up-fecha">Fecha del Electrocardiograma *</label>
+                <input class="form-input" type="date" id="up-fecha">
+              </div>
+              <div class="form-field full">
+                <label class="form-label">Archivo (PDF o Imagen) *</label>
+                <div class="drop-zone" id="drop-zone">
+                  <input type="file" id="up-file" accept=".pdf,.jpg,.jpeg,.png" onchange="onFileSelected(this)">
+                  <div class="drop-icon">📁</div>
+                  <p class="drop-text">Arrastra el archivo aquí o <strong>haz clic para seleccionar</strong></p>
+                  <p class="drop-hint">PDF, JPG o PNG — máximo 10 MB</p>
+                </div>
+                <div class="file-selected" id="file-selected" style="display:none">
+                  <span class="file-icon">✔</span>
+                  <span id="file-name-display"></span>
+                </div>
+                <div class="progress-wrap" id="progress-wrap" style="display:none">
+                  <div class="progress-bar" id="progress-bar"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button class="btn btn-primary" id="btn-upload" onclick="doUpload()">
+                ↑ Subir Electro
+              </button>
+              <button class="btn btn-secondary" onclick="resetForm()">
+                ✕ Limpiar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel: Mis registros -->
+        <div id="panel-my-records" class="panel">
+          <div class="records-header">
+            <div>
+              <h3 class="section-title">Mis Registros</h3>
+              <p class="section-desc" style="margin-bottom:0">Electros que has subido al sistema.</p>
+            </div>
+            <input class="search-box" type="text" placeholder="🔍 Buscar paciente..."
+              oninput="filterRecords(this.value)">
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Paciente</th>
+                  <th>Cédula</th>
+                  <th data-sort="fechaElectro">Fecha Electro</th>
+                  <th data-sort="fechaSubida">Fecha Subida</th>
+                  <th>Archivo</th>
+                  <th>Observación</th>
+                  <th>Detalle</th>
+                </tr>
+              </thead>
+              <tbody id="my-table-body">
+                <tr>
+                  <td colspan="7" class="loading-row">Cargando...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VISTA MÉDICO ── -->
+      <div id="view-medico" style="display:none">
+        <div class="records-header">
+          <div>
+            <h3 class="section-title">Electros de Pacientes</h3>
+            <p class="section-desc" style="margin-bottom:0">Visualice y deje observaciones en los electrocardiogramas.
+            </p>
+          </div>
+          <input class="search-box" type="text" placeholder="🔍 Buscar paciente o cédula..."
+            oninput="filterRecords(this.value)">
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Paciente</th>
+                <th>Cédula</th>
+                <th data-sort="fechaElectro">Fecha Electro</th>
+                <th data-sort="fechaSubida">Fecha Subida</th>
+                <th>Subido por</th>
+                <th>Archivo</th>
+                <th>Observación</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="med-table-body">
+              <tr>
+                <td colspan="8" class="loading-row">Cargando...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+     MODAL DETALLE
+══════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h4 class="modal-title" id="modal-title">Detalle del Electro</h4>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid" id="modal-details"></div>
+        <div class="obs-section">
+          <h6 class="obs-title">💬 Observación del Médico</h6>
+          <div id="modal-obs-content"></div>
+        </div>
+      </div>
+      <div class="modal-footer" id="modal-footer"></div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+
+  <script>
+    // ═══════════════════════════════════════════════════════
+    // ANIMACIÓN ECG — Fondo del Login
+    // ═══════════════════════════════════════════════════════
+    (function () {
+      const canvas = document.getElementById('ecg-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      // Forma del pulso ECG (una sola repetición normalizada 0-1 en X, -1 a 1 en Y)
+      const ECG_SHAPE = [
+        [0.00, 0.00], [0.10, 0.00], [0.12, 0.05], [0.14, -0.05],
+        [0.16, 0.00], [0.18, 0.00], [0.20, 0.10], [0.22, 0.90],
+        [0.24, -0.80], [0.26, 0.30], [0.30, 0.00], [0.35, 0.00],
+        [0.37, 0.15], [0.39, 0.12], [0.41, 0.00], [1.00, 0.00],
+      ];
+
+      // Múltiples líneas ECG con distintas filas y velocidades
+      const ROWS = 5;
+      let lines = [];
+
+      function buildLines(h) {
+        lines = [];
+        const rowH = h / ROWS;
+        for (let i = 0; i < ROWS; i++) {
+          lines.push({
+            y: rowH * i + rowH / 2,
+            speed: 0.18 + i * 0.04,          // px por frame
+            offset: -(i * 320),                // desfase inicial
+            amp: rowH * 0.28,              // amplitud vertical
+          });
+        }
+      }
+
+      function resize() {
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+        buildLines(canvas.height);
+      }
+
+      function getEcgY(x, cycleW, amp) {
+        // Normaliza x dentro del ciclo
+        const t = ((x % cycleW) + cycleW) % cycleW / cycleW; // 0..1
+        // Interpolación lineal sobre ECG_SHAPE
+        for (let i = 0; i < ECG_SHAPE.length - 1; i++) {
+          const [x0, y0] = ECG_SHAPE[i];
+          const [x1, y1] = ECG_SHAPE[i + 1];
+          if (t >= x0 && t <= x1) {
+            const pct = (t - x0) / (x1 - x0);
+            return (y0 + (y1 - y0) * pct) * amp;
+          }
+        }
+        return 0;
+      }
+
+      // Punto brillante que viaja sobre la línea
+      function drawGlowDot(x, y) {
+        const r = ctx.createRadialGradient(x, y, 0, x, y, 10);
+        r.addColorStop(0, 'rgba(255,255,255,0.95)');
+        r.addColorStop(0.4, 'rgba(160,240,248,0.6)');
+        r.addColorStop(1, 'rgba(0,151,167,0)');
+        ctx.fillStyle = r;
+        ctx.beginPath();
+        ctx.arc(x, y, 10, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const CYCLE_W = 340; // ancho de un ciclo ECG en px
+
+      function draw() {
+        const W = canvas.width;
+        const H = canvas.height;
+        ctx.clearRect(0, 0, W, H);
+
+        lines.forEach(line => {
+          line.offset += line.speed;
+
+          // ── Trazar la línea completa ──
+          ctx.beginPath();
+          ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+          ctx.lineWidth = 1.5;
+          ctx.shadowBlur = 6;
+          ctx.shadowColor = 'rgba(160,240,248,0.6)';
+          ctx.lineJoin = 'round';
+          ctx.lineCap = 'round';
+
+          let started = false;
+          for (let x = 0; x <= W; x += 2) {
+            const y = line.y + getEcgY(x + line.offset, CYCLE_W, line.amp);
+            if (!started) { ctx.moveTo(x, y); started = true; }
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+
+          // ── Punto brillante que viaja de izquierda a derecha ──
+          const dotX = W - (line.offset % W + W) % W;
+          const dotY = line.y + getEcgY(dotX + line.offset, CYCLE_W, line.amp);
+          drawGlowDot(dotX, dotY);
+        });
+
+        requestAnimationFrame(draw);
+      }
+
+      // Iniciar
+      resize();
+      window.addEventListener('resize', resize);
+      draw();
+    })();
+  </script>
+</body>
+
+</html>
