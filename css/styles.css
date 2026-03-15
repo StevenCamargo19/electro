@@ -53,8 +53,9 @@
 body {
   font-family: 'Inter', sans-serif;
   color: var(--text);
-  min-height: 100vh;
-  font-size: 14px;
+  height: 100vh;
+  overflow: auto;
+  font-size: 15px;
   line-height: 1.6;
   background: var(--white);
 }
@@ -156,7 +157,7 @@ body {
 ═══════════════════════════════════════════════════ */
 .screen {
   display: none;
-  min-height: 100vh;
+  height: 100vh;
 }
 
 .screen.active {
@@ -172,6 +173,7 @@ body {
   position: relative;
   overflow: hidden;
   background: linear-gradient(145deg, #004d56 0%, #006978 35%, #00838f 65%, #0097a7 100%);
+  height: 100%;
 }
 
 /* Canvas ECG animado — ocupa todo el fondo */
@@ -199,9 +201,9 @@ body {
   z-index: 1;
   background: rgba(255, 255, 255, 0.97);
   border-radius: var(--radius-xl);
-  padding: 20px 30px;
+  padding: 18px 32px;
   width: 100%;
-  max-width: 400px;
+  max-width: 360px;
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.12),
     0 24px 64px rgba(0, 30, 40, 0.45),
@@ -218,13 +220,13 @@ body {
 }
 
 .login-logo-img {
-  max-height: 72px;
-  max-width: 220px;
+  max-height: 68px;
+  max-width: 200px;
   object-fit: contain;
 }
 
 .login-logo-fallback {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--teal);
   letter-spacing: -0.3px;
@@ -234,13 +236,13 @@ body {
   font-size: 22px;
   font-weight: 700;
   color: var(--teal);
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
 /* Campos del login */
 .field-group {
   text-align: left;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .field-label {
@@ -253,7 +255,7 @@ body {
 
 .field-input {
   width: 100%;
-  padding: 11px 14px;
+  padding: 10px 14px;
   border: 1.5px solid var(--border);
   border-radius: var(--radius);
   font-family: 'Inter', sans-serif;
@@ -275,7 +277,7 @@ body {
 
 .btn-login {
   width: 100%;
-  padding: 13px;
+  padding: 12px;
   background: var(--teal);
   color: white;
   border: none;
@@ -303,13 +305,14 @@ body {
 ═══════════════════════════════════════════════════ */
 #screen-app {
   flex-direction: column;
+  height: 100%;
 }
 
 .navbar {
   background: var(--white);
   border-bottom: 1px solid var(--border);
-  height: 62px;
-  padding: 0 28px;
+  height: 58px;
+  padding: 0 24px;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -323,7 +326,7 @@ body {
   max-width: 1140px;
   margin: 0 auto;
   width: 100%;
-  height: 62px;
+  height: 58px;
 }
 
 .navbar-left {
@@ -333,13 +336,13 @@ body {
 
 /* Logo en navbar */
 .navbar-logo-img {
-  max-height: 38px;
-  max-width: 160px;
+  max-height: 36px;
+  max-width: 150px;
   object-fit: contain;
 }
 
 .navbar-logo-fallback {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--teal);
   letter-spacing: -0.2px;
@@ -358,8 +361,8 @@ body {
 }
 
 .user-avatar {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -425,10 +428,12 @@ body {
 ═══════════════════════════════════════════════════ */
 .app-main {
   flex: 1;
-  padding: 32px 28px;
+  padding: 14px 24px;
   max-width: 1140px;
   margin: 0 auto;
   width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -443,9 +448,9 @@ body {
 }
 
 .section-desc {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-2);
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -454,7 +459,7 @@ body {
 .tab-bar {
   display: flex;
   gap: 4px;
-  margin-bottom: 28px;
+  margin-bottom: 16px;
   background: var(--teal-light);
   padding: 4px;
   border-radius: var(--radius);
@@ -462,7 +467,7 @@ body {
 }
 
 .tab-btn {
-  padding: 9px 22px;
+  padding: 8px 20px;
   border-radius: 8px;
   border: none;
   background: transparent;
@@ -512,7 +517,7 @@ body {
   background: var(--white);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 32px;
+  padding: 20px 22px;
   max-width: 640px;
   box-shadow: var(--shadow-sm);
 }
@@ -520,13 +525,13 @@ body {
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  gap: 12px;
 }
 
 .form-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .form-field.full {
@@ -542,7 +547,7 @@ body {
 }
 
 .form-input {
-  padding: 11px 13px;
+  padding: 10px 13px;
   border: 1.5px solid var(--border);
   border-radius: var(--radius);
   font-family: 'Inter', sans-serif;
@@ -565,7 +570,7 @@ body {
   position: relative;
   border: 2px dashed var(--border);
   border-radius: var(--radius);
-  padding: 30px 20px;
+  padding: 16px 18px;
   text-align: center;
   cursor: pointer;
   background: var(--surface);
@@ -586,7 +591,7 @@ body {
 }
 
 .drop-icon {
-  font-size: 28px;
+  font-size: 26px;
   margin-bottom: 8px;
 }
 
@@ -610,7 +615,7 @@ body {
   align-items: center;
   gap: 8px;
   margin-top: 10px;
-  padding: 9px 13px;
+  padding: 8px 12px;
   background: var(--green-light);
   border: 1.5px solid #a5d6a7;
   border-radius: var(--radius);
@@ -620,7 +625,7 @@ body {
 }
 
 .file-icon {
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .progress-wrap {
@@ -655,17 +660,17 @@ body {
 .form-actions {
   display: flex;
   gap: 10px;
-  margin-top: 26px;
+  margin-top: 16px;
 }
 
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 11px 22px;
+  padding: 10px 20px;
   border-radius: var(--radius);
   font-family: 'Inter', sans-serif;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   border: none;
   cursor: pointer;
@@ -702,7 +707,7 @@ body {
 }
 
 .btn-sm {
-  padding: 6px 13px;
+  padding: 6px 12px;
   font-size: 12px;
 }
 
@@ -735,15 +740,15 @@ body {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 14px;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .search-box {
-  padding: 10px 14px;
+  padding: 9px 13px;
   border: 1.5px solid var(--border);
   border-radius: var(--radius);
   font-family: 'Inter', sans-serif;
-  font-size: 13px;
+  font-size: 14px;
   min-width: 260px;
   outline: none;
   background: var(--white);
@@ -761,6 +766,8 @@ body {
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-sm);
+  flex: 1;
+  min-height: 0;
 }
 
 table {
@@ -773,9 +780,9 @@ thead {
 }
 
 th {
-  padding: 11px 15px;
+  padding: 9px 13px;
   text-align: left;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.7px;
@@ -785,7 +792,7 @@ th {
 }
 
 td {
-  padding: 13px 15px;
+  padding: 10px 13px;
   font-size: 13px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
@@ -805,13 +812,13 @@ tbody tr:hover {
 
 .loading-row {
   text-align: center;
-  padding: 48px 20px;
+  padding: 32px 20px;
   color: var(--text-2);
 }
 
 .obs-badge {
   display: inline-block;
-  padding: 3px 10px;
+  padding: 3px 9px;
   border-radius: 20px;
   font-size: 11px;
   font-weight: 600;
@@ -830,12 +837,12 @@ tbody tr:hover {
 /* Empty state */
 .empty-state {
   text-align: center;
-  padding: 52px 20px;
+  padding: 40px 20px;
 }
 
 .empty-icon {
-  font-size: 40px;
-  margin-bottom: 12px;
+  font-size: 32px;
+  margin-bottom: 10px;
 }
 
 .empty-title {
@@ -893,7 +900,7 @@ tbody tr:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 22px 26px;
+  padding: 18px 24px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -904,8 +911,8 @@ tbody tr:hover {
 }
 
 .modal-close {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
   border: none;
   background: var(--teal-light);
@@ -920,14 +927,14 @@ tbody tr:hover {
 }
 
 .modal-body {
-  padding: 24px 26px;
+  padding: 20px 24px;
 }
 
 .detail-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 22px;
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
 .detail-label {
@@ -947,11 +954,11 @@ tbody tr:hover {
 
 .obs-section {
   border-top: 1px solid var(--border);
-  padding-top: 20px;
+  padding-top: 16px;
 }
 
 .obs-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   margin-bottom: 12px;
   color: var(--text);
@@ -961,7 +968,7 @@ tbody tr:hover {
   background: var(--teal-light);
   border: 1px solid var(--teal-soft);
   border-radius: var(--radius);
-  padding: 14px;
+  padding: 13px;
   font-size: 13px;
   color: var(--teal-darker);
   line-height: 1.7;
@@ -976,12 +983,12 @@ tbody tr:hover {
 
 .obs-textarea {
   width: 100%;
-  padding: 12px 14px;
+  padding: 11px 13px;
   border: 1.5px solid var(--border);
   border-radius: var(--radius);
   font-family: 'Inter', sans-serif;
   font-size: 13px;
-  min-height: 120px;
+  min-height: 90px;
   resize: vertical;
   outline: none;
   color: var(--text);
@@ -998,7 +1005,7 @@ tbody tr:hover {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
-  padding: 16px 26px;
+  padding: 16px 24px;
   border-top: 1px solid var(--border);
 }
 
@@ -1007,11 +1014,11 @@ tbody tr:hover {
 ═══════════════════════════════════════════════════ */
 @media (max-width: 680px) {
   .app-main {
-    padding: 20px 16px;
+    padding: 16px 14px;
   }
 
   .navbar {
-    padding: 0 16px;
+    padding: 0 14px;
   }
 
   .form-grid {
@@ -1023,11 +1030,11 @@ tbody tr:hover {
   }
 
   .form-card {
-    padding: 22px 18px;
+    padding: 18px 16px;
   }
 
   .login-card {
-    padding: 36px 28px;
+    padding: 24px 22px;
   }
 
   .records-header {
@@ -1040,7 +1047,7 @@ tbody tr:hover {
 
   th,
   td {
-    padding: 10px 12px;
+    padding: 9px 10px;
   }
 
   .user-info {

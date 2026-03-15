@@ -6,18 +6,18 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbzwlZtsizFao6OgOC-H8SUZ
 // ═══════════════════════════════════════════════════════════════
 // ESTADO GLOBAL
 // ═══════════════════════════════════════════════════════════════
-let currentUser   = null;
-let allRecords    = [];
+let currentUser = null;
+let allRecords = [];
 let currentRecord = null;
 
 // Estado de ordenamiento — por defecto: fecha subida descendente
 let sortField = 'fechaSubida';
-let sortDir   = 'desc';
+let sortDir = 'desc';
 
 // Estado de paginación
-const PAGE_SIZE    = 15;   // registros por página — ajusta según prefieras
-let   currentPage  = 1;
-let   currentList  = [];   // lista activa (filtrada + ordenada)
+const PAGE_SIZE = 15;   // registros por página — ajusta según prefieras
+let currentPage = 1;
+let currentList = [];   // lista activa (filtrada + ordenada)
 
 // ═══════════════════════════════════════════════════════════════
 // UTILIDADES — Loading
@@ -107,7 +107,16 @@ async function doLogin() {
 function doLogout() {
   sessionStorage.removeItem('cardioUser');
   currentUser = null;
-  allRecords  = [];
+  allRecords = [];
+
+  // Reiniciar animación ECG (solo si la función existe)
+  try {
+    if (window.restartEcgAnimation) {
+      window.restartEcgAnimation();
+    }
+  } catch (e) {
+    console.warn('No se pudo reiniciar la animación ECG:', e);
+  }
 
   document.getElementById('screen-app').classList.remove('active');
   document.getElementById('screen-login').classList.add('active');
@@ -133,7 +142,7 @@ function enterApp() {
     (currentUser.rol === 'medico' ? 'avatar-medico' : 'avatar-enfermero');
 
   // Ocultar ambas vistas antes de decidir cuál mostrar
-  document.getElementById('view-medico').style.display    = 'none';
+  document.getElementById('view-medico').style.display = 'none';
   document.getElementById('view-enfermero').style.display = 'none';
 
   if (currentUser.rol === 'medico') {
@@ -189,10 +198,10 @@ function resetForm() {
 }
 
 async function doUpload() {
-  const cedula       = document.getElementById('up-cedula').value.trim();
-  const nombre       = document.getElementById('up-nombre').value.trim();
+  const cedula = document.getElementById('up-cedula').value.trim();
+  const nombre = document.getElementById('up-nombre').value.trim();
   const fechaElectro = document.getElementById('up-fecha').value;
-  const fileInput    = document.getElementById('up-file');
+  const fileInput = document.getElementById('up-file');
 
   if (!cedula || !nombre || !fechaElectro || !fileInput.files[0]) {
     toast('Completa todos los campos y selecciona un archivo', 'error');
@@ -200,24 +209,24 @@ async function doUpload() {
   }
 
   const file = fileInput.files[0];
-  const btn  = document.getElementById('btn-upload');
+  const btn = document.getElementById('btn-upload');
   btn.disabled = true;
   btn.textContent = 'Subiendo...';
   document.getElementById('progress-wrap').style.display = 'block';
 
   try {
-    const base64   = await fileToBase64(file);
+    const base64 = await fileToBase64(file);
     const fileData = base64.split(',')[1];
 
     const res = await apiCall({
-      action:         'uploadRecord',
+      action: 'uploadRecord',
       fileData,
-      fileName:       file.name,
-      mimeType:       file.type,
+      fileName: file.name,
+      mimeType: file.type,
       cedulaPaciente: cedula,
       nombrePaciente: nombre,
       fechaElectro,
-      subidoPor:      currentUser.username
+      subidoPor: currentUser.username
     });
 
     if (res.success) {
@@ -239,7 +248,7 @@ async function doUpload() {
 function fileToBase64(file) {
   return new Promise((res, rej) => {
     const r = new FileReader();
-    r.onload  = () => res(r.result);
+    r.onload = () => res(r.result);
     r.onerror = rej;
     r.readAsDataURL(file);
   });
@@ -251,8 +260,8 @@ function fileToBase64(file) {
 async function loadRecords() {
   try {
     const res = await apiCall({
-      action:   'getRecords',
-      rol:      currentUser.rol,
+      action: 'getRecords',
+      rol: currentUser.rol,
       username: currentUser.username
     });
 
@@ -291,7 +300,7 @@ function setSort(field) {
     sortDir = sortDir === 'desc' ? 'asc' : 'desc';
   } else {
     sortField = field;
-    sortDir   = 'desc';
+    sortDir = 'desc';
   }
   currentPage = 1;
   currentList = sortList(currentList);
@@ -303,7 +312,7 @@ function updateSortIndicators() {
   // Actualiza los íconos de los encabezados
   document.querySelectorAll('th[data-sort]').forEach(th => {
     const field = th.dataset.sort;
-    const icon  = th.querySelector('.sort-icon');
+    const icon = th.querySelector('.sort-icon');
     if (!icon) return;
     if (field === sortField) {
       icon.textContent = sortDir === 'desc' ? ' ↓' : ' ↑';
@@ -320,10 +329,10 @@ function filterRecords(query) {
   const filtered = !q
     ? allRecords
     : allRecords.filter(r =>
-        String(r.nombrePaciente  || '').toLowerCase().includes(q) ||
-        String(r.cedulaPaciente  || '').toLowerCase().includes(q) ||
-        String(r.subidoPor       || '').toLowerCase().includes(q)
-      );
+      String(r.nombrePaciente || '').toLowerCase().includes(q) ||
+      String(r.cedulaPaciente || '').toLowerCase().includes(q) ||
+      String(r.subidoPor || '').toLowerCase().includes(q)
+    );
   currentPage = 1;
   currentList = sortList(filtered);
   renderTable(currentList, !q);
@@ -331,8 +340,8 @@ function filterRecords(query) {
 
 function renderTable(records, isFullList) {
   const isMedico = currentUser.rol === 'medico';
-  const tbody    = document.getElementById(isMedico ? 'med-table-body' : 'my-table-body');
-  const cols     = isMedico ? 8 : 7;
+  const tbody = document.getElementById(isMedico ? 'med-table-body' : 'my-table-body');
+  const cols = isMedico ? 8 : 7;
 
   // ── Actualizar encabezados con botones de orden ──
   const thead = tbody.closest('table').querySelector('thead tr');
@@ -340,7 +349,7 @@ function renderTable(records, isFullList) {
     thead.querySelectorAll('th[data-sort]').forEach(th => {
       if (!th.querySelector('.sort-icon')) {
         const icon = document.createElement('span');
-        icon.className   = 'sort-icon';
+        icon.className = 'sort-icon';
         icon.textContent = ' ↕';
         icon.style.opacity = '0.35';
         th.appendChild(icon);
@@ -357,11 +366,11 @@ function renderTable(records, isFullList) {
 
   // ── Paginador ──
   const totalRecords = records.length;
-  const totalPages   = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
   if (currentPage > totalPages) currentPage = totalPages;
 
-  const start    = (currentPage - 1) * PAGE_SIZE;
-  const end      = Math.min(start + PAGE_SIZE, totalRecords);
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const end = Math.min(start + PAGE_SIZE, totalRecords);
   const pageData = records.slice(start, end);
 
   // Contenedor del paginador (justo debajo del table-wrap)
@@ -380,9 +389,9 @@ function renderTable(records, isFullList) {
           <div class="empty-icon">${isFullList ? '📋' : '🔍'}</div>
           <div class="empty-title">${isFullList ? 'Sin registros' : 'Sin resultados'}</div>
           <div class="empty-desc">${isFullList
-            ? (isMedico ? 'Aún no hay electros en el sistema.' : 'No has subido electros aún.')
-            : 'No hay registros que coincidan con la búsqueda.'
-          }</div>
+        ? (isMedico ? 'Aún no hay electros en el sistema.' : 'No has subido electros aún.')
+        : 'No hay registros que coincidan con la búsqueda.'
+      }</div>
         </div>
       </td></tr>`;
     pagerEl.innerHTML = '';
@@ -392,17 +401,17 @@ function renderTable(records, isFullList) {
   // ── Filas de la página actual ──
   tbody.innerHTML = pageData.map(r => {
     const realIndex = allRecords.indexOf(r);
-    const hasObs    = r.observacion && r.observacion.trim();
-    const obsBadge  = `<span class="obs-badge ${hasObs ? 'obs-yes' : 'obs-no'}">
+    const hasObs = r.observacion && r.observacion.trim();
+    const obsBadge = `<span class="obs-badge ${hasObs ? 'obs-yes' : 'obs-no'}">
                          ${hasObs ? '✓ Sí' : 'Pendiente'}
                        </span>`;
-    const verBtn    = `<a href="${r.fileUrl}" target="_blank">
+    const verBtn = `<a href="${r.fileUrl}" target="_blank">
                          <button class="btn btn-sm btn-teal-outline">🔗 Ver</button>
                        </a>`;
-    const detBtn    = `<button class="btn btn-sm btn-secondary" onclick="openModal(${realIndex})">
+    const detBtn = `<button class="btn btn-sm btn-secondary" onclick="openModal(${realIndex})">
                          🔍 Detalle
                        </button>`;
-    const revBtn    = `<button class="btn btn-sm btn-green-outline" onclick="openModal(${realIndex})">
+    const revBtn = `<button class="btn btn-sm btn-green-outline" onclick="openModal(${realIndex})">
                          ✏️ Revisar
                        </button>`;
 
@@ -437,7 +446,7 @@ function renderTable(records, isFullList) {
   let pageButtons = '';
   const delta = 2;
   const rangeStart = Math.max(1, currentPage - delta);
-  const rangeEnd   = Math.min(totalPages, currentPage + delta);
+  const rangeEnd = Math.min(totalPages, currentPage + delta);
 
   if (rangeStart > 1) {
     pageButtons += `<button class="page-btn" onclick="goToPage(1)">1</button>`;
@@ -474,8 +483,8 @@ function goToPage(page) {
 // MODAL
 // ═══════════════════════════════════════════════════════════════
 function openModal(index) {
-  currentRecord  = allRecords[index];
-  const r        = currentRecord;
+  currentRecord = allRecords[index];
+  const r = currentRecord;
   const isMedico = currentUser.rol === 'medico';
 
   document.getElementById('modal-title').textContent = r.nombrePaciente;
@@ -534,7 +543,7 @@ function closeModal() {
 
 // Cerrar al hacer clic en el fondo
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('modal-overlay').addEventListener('click', function(e) {
+  document.getElementById('modal-overlay').addEventListener('click', function (e) {
     if (e.target === this) closeModal();
   });
 });
@@ -549,8 +558,8 @@ async function saveObservation() {
   showLoading('Guardando observación...');
   try {
     const res = await apiCall({
-      action:      'saveObservation',
-      rowIndex:    currentRecord.rowIndex,
+      action: 'saveObservation',
+      rowIndex: currentRecord.rowIndex,
       observacion: obs
     });
     if (res.success) {

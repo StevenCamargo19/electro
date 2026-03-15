@@ -257,6 +257,7 @@
       const canvas = document.getElementById('ecg-canvas');
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
+      let ecgAnimation = null;
 
       // Forma del pulso ECG (una sola repetición normalizada 0-1 en X, -1 a 1 en Y)
       const ECG_SHAPE = [
@@ -276,9 +277,9 @@
         for (let i = 0; i < ROWS; i++) {
           lines.push({
             y: rowH * i + rowH / 2,
-            speed: 0.18 + i * 0.04,          // px por frame
-            offset: -(i * 320),                // desfase inicial
-            amp: rowH * 0.28,              // amplitud vertical
+            speed: 0.18 + i * 0.04,
+            offset: -(i * 320),
+            amp: rowH * 0.28,
           });
         }
       }
@@ -290,9 +291,7 @@
       }
 
       function getEcgY(x, cycleW, amp) {
-        // Normaliza x dentro del ciclo
-        const t = ((x % cycleW) + cycleW) % cycleW / cycleW; // 0..1
-        // Interpolación lineal sobre ECG_SHAPE
+        const t = ((x % cycleW) + cycleW) % cycleW / cycleW;
         for (let i = 0; i < ECG_SHAPE.length - 1; i++) {
           const [x0, y0] = ECG_SHAPE[i];
           const [x1, y1] = ECG_SHAPE[i + 1];
@@ -304,7 +303,6 @@
         return 0;
       }
 
-      // Punto brillante que viaja sobre la línea
       function drawGlowDot(x, y) {
         const r = ctx.createRadialGradient(x, y, 0, x, y, 10);
         r.addColorStop(0, 'rgba(255,255,255,0.95)');
@@ -316,7 +314,7 @@
         ctx.fill();
       }
 
-      const CYCLE_W = 340; // ancho de un ciclo ECG en px
+      const CYCLE_W = 340;
 
       function draw() {
         const W = canvas.width;
@@ -326,7 +324,6 @@
         lines.forEach(line => {
           line.offset += line.speed;
 
-          // ── Trazar la línea completa ──
           ctx.beginPath();
           ctx.strokeStyle = 'rgba(255,255,255,0.85)';
           ctx.lineWidth = 1.5;
@@ -344,19 +341,35 @@
           ctx.stroke();
           ctx.shadowBlur = 0;
 
-          // ── Punto brillante que viaja de izquierda a derecha ──
           const dotX = W - (line.offset % W + W) % W;
           const dotY = line.y + getEcgY(dotX + line.offset, CYCLE_W, line.amp);
           drawGlowDot(dotX, dotY);
         });
 
-        requestAnimationFrame(draw);
+        ecgAnimation = requestAnimationFrame(draw);
       }
 
-      // Iniciar
-      resize();
-      window.addEventListener('resize', resize);
-      draw();
+      function init() {
+        resize();
+        window.addEventListener('resize', resize);
+        draw();
+      }
+
+      // Función global para reiniciar la animación
+      window.restartEcgAnimation = function () {
+        if (ecgAnimation) {
+          cancelAnimationFrame(ecgAnimation);
+          ecgAnimation = null;
+        }
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Pequeño delay para asegurar que el canvas sea visible
+        setTimeout(() => {
+          resize();
+          draw();
+        }, 50);
+      };
+
+      init();
     })();
   </script>
 </body>
