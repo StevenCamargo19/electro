@@ -126,7 +126,7 @@
               </div>
               <div class="form-field full">
                 <label class="form-label" for="up-fecha">Fecha del Electrocardiograma *</label>
-                <input class="form-input" type="date" id="up-fecha">
+                <input class="form-input" type="date" id="up-fecha" onclick="this.showPicker()">
               </div>
               <div class="form-field full">
                 <label class="form-label">Archivo PDF *</label>
@@ -168,12 +168,16 @@
               <p class="section-desc" style="margin-bottom:0">Electros que has subido al sistema.</p>
             </div>
             <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-              <select class="search-box" id="obs-filter-enf" onchange="filterRecords()" style="min-width:auto; width:180px;">
-                <option value="all">Todas las observaciones</option>
-                <option value="yes">Con observación</option>
-                <option value="no">Sin observación</option>
+              <select class="search-box" id="filtro-general-enf" onchange="filterRecords()"
+                style="min-width:auto; width:200px;">
+                <option value="todos">Todos los electros</option>
+                <option value="sin-estado">Sin estado registrado</option>
+                <option value="aprobados">Aprobados</option>
+                <option value="no-aprobados">No Aprobados</option>
+                <option value="con-observacion">Con observación</option>
+                <option value="sin-observacion">Sin observación</option>
               </select>
-              <input class="search-box" id="search-enf" type="text" placeholder="🔍 Buscar paciente..."
+              <input class="search-box" id="search-enf" type="text" placeholder="🔍 Buscar paciente o cédula..."
                 oninput="filterRecords()">
             </div>
           </div>
@@ -186,6 +190,7 @@
                   <th data-sort="fechaElectro">Fecha Electro</th>
                   <th data-sort="fechaSubida">Fecha Subida</th>
                   <th>Archivo</th>
+                  <th>Estado</th>
                   <th>Observación</th>
                   <th>Detalle</th>
                 </tr>
@@ -209,10 +214,14 @@
             </p>
           </div>
           <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-            <select class="search-box" id="obs-filter-med" onchange="filterRecords()" style="min-width:auto; width:180px;">
-              <option value="all">Todas las observaciones</option>
-              <option value="yes">Con observación</option>
-              <option value="no">Sin observación</option>
+            <select class="search-box" id="filtro-general-med" onchange="filterRecords()"
+              style="min-width:auto; width:200px;">
+              <option value="todos">Todos los electros</option>
+              <option value="sin-estado">Sin estado registrado</option>
+              <option value="aprobados">Aprobados</option>
+              <option value="no-aprobados">No Aprobados</option>
+              <option value="con-observacion">Con observación</option>
+              <option value="sin-observacion">Sin observación</option>
             </select>
             <input class="search-box" id="search-med" type="text" placeholder="🔍 Buscar paciente o cédula..."
               oninput="filterRecords()">
@@ -228,6 +237,7 @@
                 <th data-sort="fechaSubida">Fecha Subida</th>
                 <th>Subido por</th>
                 <th>Archivo</th>
+                <th>Estado</th>
                 <th>Observación</th>
                 <th>Acción</th>
               </tr>
@@ -258,6 +268,11 @@
         <div class="obs-section">
           <h6 class="obs-title">💬 Observación del Médico</h6>
           <div id="modal-obs-content"></div>
+        </div>
+        <div class="obs-section" id="aprobado-section"
+          style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px;">
+          <h6 class="obs-title">📋 Estado del Electro</h6>
+          <div id="modal-aprobado-content"></div>
         </div>
       </div>
       <div class="modal-footer" id="modal-footer"></div>

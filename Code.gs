@@ -26,6 +26,9 @@ function doPost(e) {
       case 'saveObservation':
         result = handleSaveObservation(data);
         break;
+      case 'saveAprobado':
+        result = handleSaveAprobado(data);
+        break;
       case 'uploadChunk':
         result = handleUploadChunk(data);
         break;
@@ -79,7 +82,7 @@ function handleLogin(data) {
 // SUBIR ARCHIVO + REGISTRAR EN SHEETS
 // ============================================================
 function handleUploadRecord(data) {
-  const { fileData, fileName, mimeType, cedulaPaciente, nombrePaciente, fechaElectro, subidoPor } = data;
+  const { fileData, fileName, mimeType, cedulaPaciente, nombrePaciente, fechaElectro, subidoPor, aprobado } = data;
 
   // Validar que sea PDF
   if (mimeType && mimeType !== 'application/pdf') {
@@ -122,7 +125,8 @@ function handleUploadRecord(data) {
     fileUrl,
     fileId,
     subidoPor,
-    ''
+    '',
+    aprobado || ''
   ]);
 
   return { success: true, message: 'Archivo subido correctamente', fileUrl };
@@ -132,7 +136,7 @@ function handleUploadRecord(data) {
 // SUBIR ARCHIVO EN CHUNKS
 // ============================================================
 function handleUploadChunk(data) {
-  const { uploadId, chunkIndex, totalChunks, chunkData } = data;
+  const { uploadId, chunkIndex, totalChunks, chunkData, aprobado } = data;
   const cache = CacheService.getScriptCache();
   const cacheKey = 'upload_' + uploadId + '_' + chunkIndex;
 
@@ -220,7 +224,8 @@ function handleUploadChunk(data) {
     fileUrl,
     fileId,
     subidoPor,
-    ''
+    '',
+    aprobado || ''
   ]);
 
   return { success: true, complete: true, message: 'Archivo subido correctamente', fileUrl };
@@ -268,6 +273,7 @@ function handleGetRecords(data) {
       fileId: row[7],
       subidoPor: row[8],
       observacion: row[9],
+      aprobado: row[10] || '',
       rowIndex: i + 1
     };
 
@@ -288,6 +294,17 @@ function handleSaveObservation(data) {
   const sheet = ss.getSheetByName('Electros');
   sheet.getRange(rowIndex, 10).setValue(observacion);
   return { success: true, message: 'Observación guardada' };
+}
+
+// ============================================================
+// GUARDAR ESTADO DE APROBADO
+// ============================================================
+function handleSaveAprobado(data) {
+  const { rowIndex, aprobado } = data;
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Electros');
+  sheet.getRange(rowIndex, 11).setValue(aprobado);
+  return { success: true, message: 'Estado guardado' };
 }
 
 // ============================================================
@@ -319,9 +336,9 @@ function inicializarHojas() {
   if (!electrosSheet) {
     electrosSheet = ss.insertSheet('Electros');
   }
-  electrosSheet.getRange(1, 1, 1, 10).setValues([[
+  electrosSheet.getRange(1, 1, 1, 11).setValues([[
     'id', 'cedulaPaciente', 'nombrePaciente', 'fechaElectro',
-    'fechaSubida', 'fileName', 'fileUrl', 'fileId', 'subidoPor', 'observacion'
+    'fechaSubida', 'fileName', 'fileUrl', 'fileId', 'subidoPor', 'observacion', 'aprobado'
   ]]).setFontWeight('bold');
 
   Logger.log('✅ Hojas inicializadas correctamente');

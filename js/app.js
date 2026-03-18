@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // CONFIGURACIÓN — Reemplaza con tu URL de Google Apps Script
 // ═══════════════════════════════════════════════════════════════
-const API_URL = 'https://script.google.com/macros/s/AKfycbxu4H9C16l80nnFOUOobLwb7ORZ2DsYBolQ4Mh_ObaAj5zcE1VKOKT5NzTGRdVKAKngEQ/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzrclzYxBgrzsRtV_KwXoJUvLuNwDo0c6InmoGPFD0ditSKTioQEXtGQ-7GxlkUahwG/exec';
 
 // ═══════════════════════════════════════════════════════════════
 // ESTADO GLOBAL
@@ -434,10 +434,10 @@ function updateSortIndicators() {
 function filterRecords() {
   const isMedico = currentUser.rol === 'medico';
   const searchEl = document.getElementById(isMedico ? 'search-med' : 'search-enf');
-  const obsFilterEl = document.getElementById(isMedico ? 'obs-filter-med' : 'obs-filter-enf');
+  const filtroEl = document.getElementById(isMedico ? 'filtro-general-med' : 'filtro-general-enf');
 
   const q = (searchEl?.value || '').toLowerCase().trim();
-  const obsFilter = obsFilterEl?.value || 'all';
+  const filtro = filtroEl?.value || 'todos';
 
   let filtered = allRecords;
 
@@ -450,22 +450,28 @@ function filterRecords() {
     );
   }
 
-  // Filtro de observación
-  if (obsFilter === 'yes') {
+  // Filtro combinado (estado u observación)
+  if (filtro === 'aprobados') {
+    filtered = filtered.filter(r => r.aprobado === 'Aprobado');
+  } else if (filtro === 'no-aprobados') {
+    filtered = filtered.filter(r => r.aprobado === 'No Aprobado');
+  } else if (filtro === 'sin-estado') {
+    filtered = filtered.filter(r => !r.aprobado || r.aprobado === '');
+  } else if (filtro === 'con-observacion') {
     filtered = filtered.filter(r => r.observacion && r.observacion.trim());
-  } else if (obsFilter === 'no') {
+  } else if (filtro === 'sin-observacion') {
     filtered = filtered.filter(r => !r.observacion || !r.observacion.trim());
   }
 
   currentPage = 1;
   currentList = sortList(filtered);
-  renderTable(currentList, !q && obsFilter === 'all');
+  renderTable(currentList, !q && filtro === 'todos');
 }
 
 function renderTable(records, isFullList) {
   const isMedico = currentUser.rol === 'medico';
   const tbody = document.getElementById(isMedico ? 'med-table-body' : 'my-table-body');
-  const cols = isMedico ? 8 : 7;
+  const cols = isMedico ? 9 : 8;
 
   // ── Actualizar encabezados con botones de orden ──
   const thead = tbody.closest('table').querySelector('thead tr');
@@ -529,6 +535,17 @@ function renderTable(records, isFullList) {
     const obsBadge = `<span class="obs-badge ${hasObs ? 'obs-yes' : 'obs-no'}">
                          ${hasObs ? '✓ Sí' : 'Pendiente'}
                        </span>`;
+
+    // Badge de aprobado
+    let aprobadoBadge;
+    if (r.aprobado === 'Aprobado') {
+      aprobadoBadge = '<span class="aprobado-badge aprobado-yes">✓ Aprobado</span>';
+    } else if (r.aprobado === 'No Aprobado') {
+      aprobadoBadge = '<span class="aprobado-badge aprobado-no">✕ No Aprobado</span>';
+    } else {
+      aprobadoBadge = '<span class="aprobado-badge aprobado-pending">Sin registrar</span>';
+    }
+
     const verBtn = `<a href="${r.fileUrl}" target="_blank">
                          <button class="btn btn-sm btn-teal-outline">🔗 Ver</button>
                        </a>`;
@@ -547,6 +564,7 @@ function renderTable(records, isFullList) {
         <td>${formatDateTime(r.fechaSubida)}</td>
         <td>${r.subidoPor}</td>
         <td>${verBtn}</td>
+        <td>${aprobadoBadge}</td>
         <td>${obsBadge}</td>
         <td>${revBtn}</td>
       </tr>`;
@@ -557,6 +575,7 @@ function renderTable(records, isFullList) {
         <td>${formatDate(r.fechaElectro)}</td>
         <td>${formatDateTime(r.fechaSubida)}</td>
         <td>${verBtn}</td>
+        <td>${aprobadoBadge}</td>
         <td>${obsBadge}</td>
         <td>${detBtn}</td>
       </tr>`;
@@ -613,22 +632,15 @@ function openModal(index) {
 
   document.getElementById('modal-title').textContent = r.nombrePaciente;
 
+  // Información esencial compacta
   document.getElementById('modal-details').innerHTML = `
     <div>
       <div class="detail-label">Cédula</div>
       <div class="detail-value">${r.cedulaPaciente}</div>
     </div>
     <div>
-      <div class="detail-label">Fecha del Electro</div>
+      <div class="detail-label">Fecha Electro</div>
       <div class="detail-value">${formatDate(r.fechaElectro)}</div>
-    </div>
-    <div>
-      <div class="detail-label">Fecha de Subida</div>
-      <div class="detail-value">${formatDateTime(r.fechaSubida)}</div>
-    </div>
-    <div>
-      <div class="detail-label">Subido por</div>
-      <div class="detail-value">${r.subidoPor}</div>
     </div>
     <div style="grid-column:1/-1">
       <div class="detail-label">Archivo</div>
@@ -639,18 +651,53 @@ function openModal(index) {
       </div>
     </div>`;
 
+  // Contenido de aprobado
+  const aprobadoContent = document.getElementById('modal-aprobado-content');
+  const aprobadoSection = document.getElementById('aprobado-section');
+
+  if (isMedico) {
+    aprobadoSection.style.display = 'block';
+    let aprobadoDisplay = '';
+    if (r.aprobado === 'Aprobado') {
+      aprobadoDisplay = '<span class="aprobado-badge aprobado-yes" style="margin-bottom:8px;display:inline-block">✓ Aprobado</span>';
+    } else if (r.aprobado === 'No Aprobado') {
+      aprobadoDisplay = '<span class="aprobado-badge aprobado-no" style="margin-bottom:8px;display:inline-block">✕ No Aprobado</span>';
+    } else {
+      aprobadoDisplay = '<span class="aprobado-badge aprobado-pending" style="margin-bottom:8px;display:inline-block">Sin registrar</span>';
+    }
+    aprobadoContent.innerHTML = `
+      <div style="margin-bottom:8px;color:var(--text-2);font-size:13px;">Estado:</div>
+      ${aprobadoDisplay}
+      <select class="form-input" id="modal-aprobado-select" style="max-width:280px;">
+        <option value="">-- Seleccione estado --</option>
+        <option value="Aprobado" ${r.aprobado === 'Aprobado' ? 'selected' : ''}>✓ Aprobado</option>
+        <option value="No Aprobado" ${r.aprobado === 'No Aprobado' ? 'selected' : ''}>✕ No Aprobado</option>
+      </select>`;
+  } else {
+    aprobadoSection.style.display = 'block';
+    let aprobadoDisplay = 'Sin registrar';
+    if (r.aprobado === 'Aprobado') {
+      aprobadoDisplay = '<span class="aprobado-badge aprobado-yes">✓ Aprobado</span>';
+    } else if (r.aprobado === 'No Aprobado') {
+      aprobadoDisplay = '<span class="aprobado-badge aprobado-no">✕ No Aprobado</span>';
+    } else {
+      aprobadoDisplay = '<span class="aprobado-badge aprobado-pending">Sin registrar</span>';
+    }
+    aprobadoContent.innerHTML = aprobadoDisplay;
+  }
+
   const obsContent = document.getElementById('modal-obs-content');
   if (isMedico) {
     obsContent.innerHTML = `
       <textarea class="obs-textarea" id="obs-input"
-        placeholder="Escriba aquí su observación médica...">${r.observacion || ''}</textarea>`;
+        placeholder="Escriba una observación (obligatorio si marca No Aprobado)">${r.observacion || ''}</textarea>`;
     document.getElementById('modal-footer').innerHTML = `
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveObservation()">💾 Guardar Observación</button>`;
+      <button class="btn btn-primary" onclick="saveObservation()">💾 Guardar</button>`;
   } else {
     obsContent.innerHTML = r.observacion
       ? `<div class="obs-display">${r.observacion}</div>`
-      : `<p class="obs-empty">El médico aún no ha dejado observación para este electro.</p>`;
+      : `<p class="obs-empty">El médico aún no ha dejado observación.</p>`;
     document.getElementById('modal-footer').innerHTML = `
       <button class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
       <a href="${r.fileUrl}" target="_blank">
@@ -674,25 +721,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function saveObservation() {
   const obs = document.getElementById('obs-input').value.trim();
-  if (!obs) {
-    toast('Escribe una observación antes de guardar', 'error');
+  const aprobadoSelect = document.getElementById('modal-aprobado-select');
+  const aprobado = aprobadoSelect?.value || '';
+
+  // Estado es obligatorio
+  if (!aprobado) {
+    toast('Seleccione el estado del electro', 'error');
     return;
   }
 
-  showLoading('Guardando observación...');
+  // Si es No Aprobado, la observación es obligatoria
+  if (aprobado === 'No Aprobado' && !obs) {
+    toast('Debe escribir una observación al marcar como No Aprobado', 'error');
+    return;
+  }
+
+  showLoading('Guardando...');
   try {
-    const res = await apiCall({
+    // Guardar observación (se guarda vacío para borrar la anterior si existe)
+    const resObs = await apiCall({
       action: 'saveObservation',
       rowIndex: currentRecord.rowIndex,
       observacion: obs
     });
-    if (res.success) {
+
+    // Guardar aprobado
+    const resAprobado = await apiCall({
+      action: 'saveAprobado',
+      rowIndex: currentRecord.rowIndex,
+      aprobado: aprobado
+    });
+
+    if (resObs.success && resAprobado.success) {
       currentRecord.observacion = obs;
-      toast('✅ Observación guardada correctamente', 'success');
+      currentRecord.aprobado = aprobado;
+      toast('✅ Estado guardado correctamente', 'success');
       closeModal();
       renderRecords(allRecords);
     } else {
-      toast('Error al guardar la observación', 'error');
+      toast('Error al guardar', 'error');
     }
   } catch (e) {
     toast('Error de conexión', 'error');
