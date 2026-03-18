@@ -129,19 +129,22 @@
                 <input class="form-input" type="date" id="up-fecha">
               </div>
               <div class="form-field full">
-                <label class="form-label">Archivo (PDF o Imagen) *</label>
+                <label class="form-label">Archivo PDF *</label>
                 <div class="drop-zone" id="drop-zone">
-                  <input type="file" id="up-file" accept=".pdf,.jpg,.jpeg,.png" onchange="onFileSelected(this)">
+                  <input type="file" id="up-file" accept=".pdf" onchange="onFileSelected(this)">
                   <div class="drop-icon">📁</div>
                   <p class="drop-text">Arrastra el archivo aquí o <strong>haz clic para seleccionar</strong></p>
-                  <p class="drop-hint">PDF, JPG o PNG — máximo 10 MB</p>
+                  <p class="drop-hint">Solo archivos PDF — máximo 10 MB</p>
                 </div>
                 <div class="file-selected" id="file-selected" style="display:none">
                   <span class="file-icon">✔</span>
                   <span id="file-name-display"></span>
                 </div>
                 <div class="progress-wrap" id="progress-wrap" style="display:none">
-                  <div class="progress-bar" id="progress-bar"></div>
+                  <div class="progress-track">
+                    <div class="progress-bar" id="progress-bar"></div>
+                  </div>
+                  <span class="progress-text" id="progress-text">0%</span>
                 </div>
               </div>
             </div>

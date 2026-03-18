@@ -629,29 +629,34 @@ body {
 }
 
 .progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.progress-track {
+  flex: 1;
   height: 6px;
   background: var(--teal-soft);
   border-radius: 4px;
-  margin-top: 10px;
   overflow: hidden;
 }
 
 .progress-bar {
   height: 100%;
-  width: 65%;
+  width: 0%;
   background: var(--teal);
   border-radius: 4px;
-  animation: progressPulse 1.2s ease-in-out infinite alternate;
+  transition: width 0.3s ease;
 }
 
-@keyframes progressPulse {
-  from {
-    opacity: 1;
-  }
-
-  to {
-    opacity: 0.5;
-  }
+.progress-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--teal-dark);
+  min-width: 36px;
+  text-align: right;
 }
 
 /* ═══════════════════════════════════════════════════

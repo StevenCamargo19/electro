@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // CONFIGURACIÓN — Reemplaza con tu URL de Google Apps Script
 // ═══════════════════════════════════════════════════════════════
-const API_URL = 'https://script.google.com/macros/s/AKfycbzVuUtE0YkwFeiBhRXgJtt-nbZkMYx4T5FkNU3dw_YMmo-Mbo3lEvc-XBUkjHEE1MaG/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxu4H9C16l80nnFOUOobLwb7ORZ2DsYBolQ4Mh_ObaAj5zcE1VKOKT5NzTGRdVKAKngEQ/exec';
 
 // ═══════════════════════════════════════════════════════════════
 // ESTADO GLOBAL
@@ -16,6 +16,7 @@ let sortDir = 'desc';
 
 // Estado de paginación
 const PAGE_SIZE = 15;   // registros por página — ajusta según prefieras
+const CHUNK_SIZE = 750000; // ~750 KB por chunk de base64
 let currentPage = 1;
 let currentList = [];   // lista activa (filtrada + ordenada)
 
@@ -48,18 +49,76 @@ function toast(msg, type = 'info', duration = 3800) {
 // ═══════════════════════════════════════════════════════════════
 function formatDate(str) {
   if (!str) return '—';
-  const d = new Date(str);
-  if (isNaN(d)) return str;
+  const s = String(str);
+  // Si ya viene en formato DD/MM/YYYY, usarlo directamente
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+    return s;
+  }
+  // Detectar formato YYYY-MM-DD y parsear como hora local (no UTC)
+  const parts = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const d = parts
+    ? new Date(parseInt(parts[1]), parseInt(parts[2]) - 1, parseInt(parts[3]))
+    : new Date(s);
+  if (isNaN(d)) return s;
   return d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 function formatDateTime(str) {
   if (!str) return '—';
-  const d = new Date(str);
-  if (isNaN(d)) return str;
+  const s = String(str);
+  // Si ya viene en formato DD/MM/YYYY hh:mm:ss a (con AM/PM), usarlo directamente
+  if (/^\d{1,2}\/\d{1,2}\/\d{4} \d{1,2}:\d{2}:\d{2} [ap]\.m\.$/i.test(s)) {
+    const [datePart, timePart] = s.split(' ');
+    const [day, month, year] = datePart.split('/');
+    const [time, meridiem] = timePart.split(' ');
+    return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year} ${time} ${meridiem.toLowerCase()}`;
+  }
+  // Si viene en formato 24h sin AM/PM
+  if (/^\d{1,2}\/\d{1,2}\/\d{4} \d{1,2}:\d{2}:\d{2}$/.test(s)) {
+    const [datePart, timePart] = s.split(' ');
+    const [day, month, year] = datePart.split('/');
+    return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year} ${timePart}`;
+  }
+  const d = new Date(s);
+  if (isNaN(d)) return s;
   return d.toLocaleDateString('es-CO', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
   });
+}
+
+// Parsear fechas en formato DD/MM/YYYY o DD/MM/YYYY hh:mm:ss a para ordenamiento
+function parseDateForSort(str) {
+  if (!str) return new Date(0);
+  const s = String(str);
+
+  // Formato: DD/MM/YYYY hh:mm:ss AM/PM (ej: 18/03/2026 11:11:24 AM)
+  const match12 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM|A\.M\.|P\.M\.|am|pm|a\.m\.|p\.m\.)$/i);
+  if (match12) {
+    const [, day, month, year, hour, min, sec, meridiem] = match12;
+    let h = parseInt(hour);
+    const merid = meridiem.toUpperCase().replace(/\./g, '');
+    if (merid === 'PM' && h !== 12) h += 12;
+    if (merid === 'AM' && h === 12) h = 0;
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day), h, parseInt(min), parseInt(sec));
+  }
+
+  // Formato: DD/MM/YYYY HH:mm:ss (24h)
+  const match24 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
+  if (match24) {
+    const [, day, month, year, hour, min, sec] = match24;
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(min), parseInt(sec));
+  }
+
+  // Formato: DD/MM/YYYY (solo fecha)
+  const matchDate = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (matchDate) {
+    const [, day, month, year] = matchDate;
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  }
+
+  // Fallback: intentar parsear directamente
+  const d = new Date(s);
+  return isNaN(d) ? new Date(0) : d;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -174,9 +233,19 @@ function showTab(tab, btnEl) {
 // ═══════════════════════════════════════════════════════════════
 // SUBIDA DE ARCHIVO
 // ═══════════════════════════════════════════════════════════════
+function isPdfFile(file) {
+  return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+}
+
 function onFileSelected(input) {
   const file = input.files[0];
   if (!file) return;
+
+  if (!isPdfFile(file)) {
+    toast('Solo se permiten archivos PDF', 'error');
+    input.value = '';
+    return;
+  }
 
   if (file.size > 10 * 1024 * 1024) {
     toast('El archivo supera el límite de 10 MB', 'error');
@@ -195,6 +264,8 @@ function resetForm() {
   document.getElementById('up-file').value = '';
   document.getElementById('file-selected').style.display = 'none';
   document.getElementById('progress-wrap').style.display = 'none';
+  document.getElementById('progress-bar').style.width = '0%';
+  document.getElementById('progress-text').textContent = '0%';
 }
 
 async function doUpload() {
@@ -209,39 +280,75 @@ async function doUpload() {
   }
 
   const file = fileInput.files[0];
+
+  if (!isPdfFile(file)) {
+    toast('Solo se permiten archivos PDF', 'error');
+    return;
+  }
+
   const btn = document.getElementById('btn-upload');
+  const progressBar = document.getElementById('progress-bar');
+  const progressText = document.getElementById('progress-text');
   btn.disabled = true;
   btn.textContent = 'Subiendo...';
   document.getElementById('progress-wrap').style.display = 'block';
+  progressBar.style.width = '0%';
+  progressText.textContent = '0%';
 
   try {
     const base64 = await fileToBase64(file);
     const fileData = base64.split(',')[1];
 
-    const res = await apiCall({
-      action: 'uploadRecord',
-      fileData,
-      fileName: file.name,
-      mimeType: file.type,
-      cedulaPaciente: cedula,
-      nombrePaciente: nombre,
-      fechaElectro,
-      subidoPor: currentUser.username
-    });
+    // Dividir en chunks
+    const totalChunks = Math.ceil(fileData.length / CHUNK_SIZE);
+    const uploadId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
-    if (res.success) {
-      toast('✅ Electro subido correctamente', 'success');
-      resetForm();
-    } else {
-      toast(res.message || 'Error al subir el archivo', 'error');
+    for (let i = 0; i < totalChunks; i++) {
+      const chunkData = fileData.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+      const isLast = (i === totalChunks - 1);
+
+      const payload = {
+        action: 'uploadChunk',
+        uploadId,
+        chunkIndex: i,
+        totalChunks,
+        chunkData
+      };
+
+      // En el último chunk incluimos los metadatos
+      if (isLast) {
+        payload.fileName = file.name;
+        payload.mimeType = file.type || 'application/pdf';
+        payload.cedulaPaciente = cedula;
+        payload.nombrePaciente = nombre;
+        payload.fechaElectro = fechaElectro;
+        payload.subidoPor = currentUser.username;
+      }
+
+      const res = await apiCall(payload);
+
+      if (!res.success) {
+        toast(res.message || `Error al subir fragmento ${i + 1}`, 'error');
+        return;
+      }
+
+      // Actualizar barra de progreso
+      const pct = Math.round(((i + 1) / totalChunks) * 100);
+      progressBar.style.width = pct + '%';
+      progressText.textContent = pct + '%';
+
+      // Si el último chunk retorna la URL, la subida fue exitosa
+      if (isLast && res.complete) {
+        toast('✅ Electro subido correctamente', 'success');
+        resetForm();
+      }
     }
   } catch (e) {
-    toast('Error de conexión', 'error');
+    toast('Error de conexión. Intenta de nuevo.', 'error');
     console.error(e);
   } finally {
     btn.disabled = false;
     btn.textContent = '↑ Subir Electro';
-    document.getElementById('progress-wrap').style.display = 'none';
   }
 }
 
@@ -289,8 +396,8 @@ function renderRecords(records) {
 // ═══════════════════════════════════════════════════════════════
 function sortList(records) {
   return [...records].sort((a, b) => {
-    const da = new Date(a[sortField] || 0);
-    const db = new Date(b[sortField] || 0);
+    const da = parseDateForSort(a[sortField] || 0);
+    const db = parseDateForSort(b[sortField] || 0);
     return sortDir === 'desc' ? db - da : da - db;
   });
 }
@@ -611,6 +718,10 @@ document.addEventListener('DOMContentLoaded', () => {
     dz.classList.remove('dragging');
     const file = e.dataTransfer.files[0];
     if (file) {
+      if (!isPdfFile(file)) {
+        toast('Solo se permiten archivos PDF', 'error');
+        return;
+      }
       document.getElementById('up-file').files = e.dataTransfer.files;
       onFileSelected(document.getElementById('up-file'));
     }
