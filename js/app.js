@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // CONFIGURACIÓN — Reemplaza con tu URL de Google Apps Script
 // ═══════════════════════════════════════════════════════════════
-const API_URL = 'https://script.google.com/macros/s/AKfycbzwlZtsizFao6OgOC-H8SUZyffPMmoRu9_t656ytqU9BD05Ayz-LWoD8JAV5yvJFCKS/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzVuUtE0YkwFeiBhRXgJtt-nbZkMYx4T5FkNU3dw_YMmo-Mbo3lEvc-XBUkjHEE1MaG/exec';
 
 // ═══════════════════════════════════════════════════════════════
 // ESTADO GLOBAL
@@ -150,7 +150,7 @@ function enterApp() {
     loadRecords();
   } else if (currentUser.rol === 'enfermero') {
     document.getElementById('view-enfermero').style.display = 'block';
-    document.getElementById('up-fecha').valueAsDate = new Date();
+    document.getElementById('up-fecha').value = new Date().toLocaleDateString('en-CA');
   } else {
     toast('Rol no reconocido. Contacta al administrador.', 'error');
     doLogout();
@@ -191,7 +191,7 @@ function onFileSelected(input) {
 function resetForm() {
   document.getElementById('up-cedula').value = '';
   document.getElementById('up-nombre').value = '';
-  document.getElementById('up-fecha').valueAsDate = new Date();
+  document.getElementById('up-fecha').value = new Date().toLocaleDateString('en-CA');
   document.getElementById('up-file').value = '';
   document.getElementById('file-selected').style.display = 'none';
   document.getElementById('progress-wrap').style.display = 'none';
@@ -324,18 +324,35 @@ function updateSortIndicators() {
   });
 }
 
-function filterRecords(query) {
-  const q = query.toLowerCase().trim();
-  const filtered = !q
-    ? allRecords
-    : allRecords.filter(r =>
+function filterRecords() {
+  const isMedico = currentUser.rol === 'medico';
+  const searchEl = document.getElementById(isMedico ? 'search-med' : 'search-enf');
+  const obsFilterEl = document.getElementById(isMedico ? 'obs-filter-med' : 'obs-filter-enf');
+
+  const q = (searchEl?.value || '').toLowerCase().trim();
+  const obsFilter = obsFilterEl?.value || 'all';
+
+  let filtered = allRecords;
+
+  // Filtro de texto
+  if (q) {
+    filtered = filtered.filter(r =>
       String(r.nombrePaciente || '').toLowerCase().includes(q) ||
       String(r.cedulaPaciente || '').toLowerCase().includes(q) ||
       String(r.subidoPor || '').toLowerCase().includes(q)
     );
+  }
+
+  // Filtro de observación
+  if (obsFilter === 'yes') {
+    filtered = filtered.filter(r => r.observacion && r.observacion.trim());
+  } else if (obsFilter === 'no') {
+    filtered = filtered.filter(r => !r.observacion || !r.observacion.trim());
+  }
+
   currentPage = 1;
   currentList = sortList(filtered);
-  renderTable(currentList, !q);
+  renderTable(currentList, !q && obsFilter === 'all');
 }
 
 function renderTable(records, isFullList) {

@@ -164,8 +164,15 @@
               <h3 class="section-title">Mis Registros</h3>
               <p class="section-desc" style="margin-bottom:0">Electros que has subido al sistema.</p>
             </div>
-            <input class="search-box" type="text" placeholder="🔍 Buscar paciente..."
-              oninput="filterRecords(this.value)">
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <select class="search-box" id="obs-filter-enf" onchange="filterRecords()" style="min-width:auto; width:180px;">
+                <option value="all">Todas las observaciones</option>
+                <option value="yes">Con observación</option>
+                <option value="no">Sin observación</option>
+              </select>
+              <input class="search-box" id="search-enf" type="text" placeholder="🔍 Buscar paciente..."
+                oninput="filterRecords()">
+            </div>
           </div>
           <div class="table-wrap">
             <table>
@@ -198,8 +205,15 @@
             <p class="section-desc" style="margin-bottom:0">Visualice y deje observaciones en los electrocardiogramas.
             </p>
           </div>
-          <input class="search-box" type="text" placeholder="🔍 Buscar paciente o cédula..."
-            oninput="filterRecords(this.value)">
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <select class="search-box" id="obs-filter-med" onchange="filterRecords()" style="min-width:auto; width:180px;">
+              <option value="all">Todas las observaciones</option>
+              <option value="yes">Con observación</option>
+              <option value="no">Sin observación</option>
+            </select>
+            <input class="search-box" id="search-med" type="text" placeholder="🔍 Buscar paciente o cédula..."
+              oninput="filterRecords()">
+          </div>
         </div>
         <div class="table-wrap">
           <table>
@@ -304,6 +318,7 @@
       }
 
       function drawGlowDot(x, y) {
+        if (!isFinite(x) || !isFinite(y)) return;
         const r = ctx.createRadialGradient(x, y, 0, x, y, 10);
         r.addColorStop(0, 'rgba(255,255,255,0.95)');
         r.addColorStop(0.4, 'rgba(160,240,248,0.6)');
@@ -319,6 +334,8 @@
       function draw() {
         const W = canvas.width;
         const H = canvas.height;
+        // Si el canvas no es visible (login oculto), pausar animación
+        if (!W || !H) { ecgAnimation = requestAnimationFrame(draw); return; }
         ctx.clearRect(0, 0, W, H);
 
         lines.forEach(line => {
