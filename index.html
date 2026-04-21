@@ -251,6 +251,54 @@
         </div>
       </div>
 
+      <!-- ── VISTA ADMIN ── -->
+      <div id="view-admin" style="display:none">
+        <div class="records-header">
+          <div>
+            <h3 class="section-title">Gestión de Usuarios</h3>
+            <p class="section-desc" style="margin-bottom:0">Administra los usuarios del sistema.</p>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <select class="search-box" id="filtro-estado-user" onchange="filterUsers()"
+              style="min-width:auto; width:180px;">
+              <option value="todos">Todos</option>
+              <option value="activos">Activos</option>
+              <option value="inactivos">Inactivos</option>
+            </select>
+            <select class="search-box" id="filtro-rol-user" onchange="filterUsers()"
+              style="min-width:auto; width:180px;">
+              <option value="todos">Todos los roles</option>
+              <option value="enfermero">Enfermero</option>
+              <option value="medico">Médico</option>
+              <option value="admin">Admin</option>
+            </select>
+            <input class="search-box" id="search-user" type="text" placeholder="🔍 Buscar usuario o nombre..."
+              oninput="filterUsers()">
+            <button class="btn btn-primary" onclick="openUserModal('create')">
+              ➕ Nuevo Usuario
+            </button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Usuario</th>
+                <th>Nombre</th>
+                <th>Rol</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="users-table-body">
+              <tr>
+                <td colspan="5" class="loading-row">Cargando...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </main>
   </div>
 
@@ -276,6 +324,51 @@
         </div>
       </div>
       <div class="modal-footer" id="modal-footer"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+     MODAL USUARIO (Admin)
+══════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="user-modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h4 class="modal-title" id="user-modal-title">Nuevo Usuario</h4>
+        <button class="modal-close" onclick="closeUserModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-card" style="border:none;box-shadow:none;padding:0;max-width:100%">
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="form-label" for="user-username">Usuario *</label>
+              <input class="form-input" type="text" id="user-username" placeholder="Usuario o Correo">
+            </div>
+            <div class="form-field">
+              <label class="form-label" for="user-nombre">Nombre Completo *</label>
+              <input class="form-input" type="text" id="user-nombre" placeholder="Nombre del usuario">
+            </div>
+            <div class="form-field">
+              <label class="form-label" for="user-password">Contraseña *</label>
+              <input class="form-input" type="text" id="user-password" placeholder="Mínimo 4 caracteres">
+              <span class="form-hint" id="user-password-hint" style="display:none">Dejar vacío para mantener la
+                actual</span>
+            </div>
+            <div class="form-field">
+              <label class="form-label" for="user-rol">Rol *</label>
+              <select class="form-input" id="user-rol">
+                <option value="">-- Seleccione rol --</option>
+                <option value="enfermero">Enfermero/a</option>
+                <option value="medico">Médico</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeUserModal()">Cancelar</button>
+        <button class="btn btn-primary" id="btn-save-user" onclick="saveUser()">💾 Guardar</button>
+      </div>
     </div>
   </div>
 

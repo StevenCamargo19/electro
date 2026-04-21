@@ -10,6 +10,12 @@ let currentUser = null;
 let allRecords = [];
 let currentRecord = null;
 
+// Admin: lista de usuarios
+let allUsers = [];
+let currentUserList = [];
+let userPage = 1;
+let editingUserIndex = -1; // -1 = crear, >= 0 = editar
+
 // Estado de ordenamiento — por defecto: fecha subida descendente
 let sortField = 'fechaSubida';
 let sortDir = 'desc';
@@ -193,18 +199,24 @@ function enterApp() {
   // Header
   document.getElementById('user-name-display').textContent = currentUser.nombre;
   document.getElementById('user-rol-display').textContent =
-    currentUser.rol === 'medico' ? '🩺 Médico' : '🏥 Enfermero/a';
+    currentUser.rol === 'medico' ? '🩺 Médico' :
+    currentUser.rol === 'admin' ? '⚙️ Administrador' : '🏥 Enfermero/a';
 
   const av = document.getElementById('user-avatar');
   av.textContent = currentUser.nombre.charAt(0).toUpperCase();
   av.className = 'user-avatar ' +
-    (currentUser.rol === 'medico' ? 'avatar-medico' : 'avatar-enfermero');
+    (currentUser.rol === 'medico' ? 'avatar-medico' :
+     currentUser.rol === 'admin' ? 'avatar-admin' : 'avatar-enfermero');
 
-  // Ocultar ambas vistas antes de decidir cuál mostrar
+  // Ocultar todas las vistas antes de decidir cuál mostrar
   document.getElementById('view-medico').style.display = 'none';
   document.getElementById('view-enfermero').style.display = 'none';
+  document.getElementById('view-admin').style.display = 'none';
 
-  if (currentUser.rol === 'medico') {
+  if (currentUser.rol === 'admin') {
+    document.getElementById('view-admin').style.display = 'block';
+    loadUsers();
+  } else if (currentUser.rol === 'medico') {
     document.getElementById('view-medico').style.display = 'block';
     loadRecords();
   } else if (currentUser.rol === 'enfermero') {
@@ -717,6 +729,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('modal-overlay').addEventListener('click', function (e) {
     if (e.target === this) closeModal();
   });
+  document.getElementById('user-modal-overlay').addEventListener('click', function (e) {
+    if (e.target === this) closeUserModal();
+  });
 });
 
 async function saveObservation() {
@@ -815,3 +830,308 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') document.getElementById('login-pass').focus();
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN — Gestión de Usuarios
+// ═══════════════════════════════════════════════════════════════
+async function loadUsers() {
+  try {
+    const res = await apiCall({
+      action: 'getUsers',
+      requestedBy: currentUser.username
+    });
+    if (res.success) {
+      allUsers = res.users;
+      filterUsers();
+    } else {
+      toast(res.message || 'Error al cargar usuarios', 'error');
+    }
+  } catch (e) {
+    toast('Error de conexión', 'error');
+    console.error(e);
+  }
+}
+
+function filterUsers() {
+  const q = (document.getElementById('search-user')?.value || '').toLowerCase().trim();
+  const filtroEstado = document.getElementById('filtro-estado-user')?.value || 'todos';
+  const filtroRol = document.getElementById('filtro-rol-user')?.value || 'todos';
+
+  let filtered = allUsers;
+
+  if (q) {
+    filtered = filtered.filter(u =>
+      String(u.username || '').toLowerCase().includes(q) ||
+      String(u.nombre || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (filtroEstado === 'activos') {
+    filtered = filtered.filter(u => u.activo === 'SI');
+  } else if (filtroEstado === 'inactivos') {
+    filtered = filtered.filter(u => u.activo === 'NO');
+  }
+
+  if (filtroRol !== 'todos') {
+    filtered = filtered.filter(u => u.rol === filtroRol);
+  }
+
+  userPage = 1;
+  currentUserList = filtered;
+  renderUsersTable();
+}
+
+function renderUsersTable() {
+  const tbody = document.getElementById('users-table-body');
+  const totalRecords = currentUserList.length;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
+  if (userPage > totalPages) userPage = totalPages;
+
+  const start = (userPage - 1) * PAGE_SIZE;
+  const end = Math.min(start + PAGE_SIZE, totalRecords);
+  const pageData = currentUserList.slice(start, end);
+
+  // Paginador
+  const tableWrap = tbody.closest('.table-wrap');
+  let pagerEl = tableWrap.nextElementSibling;
+  if (!pagerEl || !pagerEl.classList.contains('pagination-bar')) {
+    pagerEl = document.createElement('div');
+    pagerEl.className = 'pagination-bar';
+    tableWrap.after(pagerEl);
+  }
+
+  if (!totalRecords) {
+    tbody.innerHTML = `
+      <tr><td colspan="5">
+        <div class="empty-state">
+          <div class="empty-icon">👤</div>
+          <div class="empty-title">Sin usuarios</div>
+          <div class="empty-desc">No se encontraron usuarios que coincidan con la búsqueda.</div>
+        </div>
+      </td></tr>`;
+    pagerEl.innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = pageData.map(u => {
+    const realIndex = allUsers.indexOf(u);
+
+    // Badge de rol
+    let rolLabel, rolClass;
+    if (u.rol === 'medico') {
+      rolLabel = '🩺 Médico';
+      rolClass = 'rol-badge rol-medico';
+    } else if (u.rol === 'admin') {
+      rolLabel = '⚙️ Admin';
+      rolClass = 'rol-badge rol-admin';
+    } else {
+      rolLabel = '🏥 Enfermero/a';
+      rolClass = 'rol-badge rol-enfermero';
+    }
+
+    // Badge de estado
+    const isActive = u.activo === 'SI';
+    const statusBadge = isActive
+      ? '<span class="status-badge status-active">● Activo</span>'
+      : '<span class="status-badge status-inactive">● Inactivo</span>';
+
+    // Botón de toggle (no mostrar desactivar para sí mismo)
+    const isSelf = u.username === currentUser.username;
+    let toggleBtn;
+    if (isSelf) {
+      toggleBtn = '<button class="btn btn-sm btn-danger-outline" disabled>⏸ Desactivar</button>';
+    } else if (isActive) {
+      toggleBtn = `<button class="btn btn-sm btn-danger-outline" onclick="toggleUserStatus(${realIndex}, 'NO')">⏸ Desactivar</button>`;
+    } else {
+      toggleBtn = `<button class="btn btn-sm btn-success-outline" onclick="toggleUserStatus(${realIndex}, 'SI')">▶ Activar</button>`;
+    }
+
+    // Botón de editar
+    const editBtn = `<button class="btn btn-sm btn-teal-outline" onclick="openUserModal('edit', ${realIndex})">✏️ Editar</button>`;
+
+    return `<tr class="${!isActive ? 'row-inactive' : ''}">
+      <td><strong>${u.username}</strong></td>
+      <td>${u.nombre}</td>
+      <td><span class="${rolClass}">${rolLabel}</span></td>
+      <td>${statusBadge}</td>
+      <td>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          ${editBtn}
+          ${toggleBtn}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Barra de paginación
+  const info = `Mostrando ${start + 1}–${end} de ${totalRecords} usuarios`;
+  let pageButtons = '';
+  const delta = 2;
+  const rangeStart = Math.max(1, userPage - delta);
+  const rangeEnd = Math.min(totalPages, userPage + delta);
+
+  if (rangeStart > 1) {
+    pageButtons += `<button class="page-btn" onclick="goToUserPage(1)">1</button>`;
+    if (rangeStart > 2) pageButtons += `<span class="page-ellipsis">…</span>`;
+  }
+  for (let i = rangeStart; i <= rangeEnd; i++) {
+    pageButtons += `<button class="page-btn ${i === userPage ? 'active' : ''}" onclick="goToUserPage(${i})">${i}</button>`;
+  }
+  if (rangeEnd < totalPages) {
+    if (rangeEnd < totalPages - 1) pageButtons += `<span class="page-ellipsis">…</span>`;
+    pageButtons += `<button class="page-btn" onclick="goToUserPage(${totalPages})">${totalPages}</button>`;
+  }
+
+  pagerEl.innerHTML = `
+    <span class="page-info">${info}</span>
+    <div class="page-controls">
+      <button class="page-btn" onclick="goToUserPage(${userPage - 1})" ${userPage === 1 ? 'disabled' : ''}>‹</button>
+      ${pageButtons}
+      <button class="page-btn" onclick="goToUserPage(${userPage + 1})" ${userPage === totalPages ? 'disabled' : ''}>›</button>
+    </div>`;
+}
+
+function goToUserPage(page) {
+  const totalPages = Math.ceil(currentUserList.length / PAGE_SIZE);
+  if (page < 1 || page > totalPages) return;
+  userPage = page;
+  renderUsersTable();
+}
+
+// ── Modal de usuario ──
+function openUserModal(mode, index) {
+  editingUserIndex = (mode === 'edit' && index !== undefined) ? index : -1;
+  const isEdit = editingUserIndex >= 0;
+  const modal = document.getElementById('user-modal-overlay');
+
+  document.getElementById('user-modal-title').textContent = isEdit ? 'Editar Usuario' : 'Nuevo Usuario';
+
+  const usernameInput = document.getElementById('user-username');
+  const nombreInput = document.getElementById('user-nombre');
+  const passwordInput = document.getElementById('user-password');
+  const rolInput = document.getElementById('user-rol');
+  const passwordHint = document.getElementById('user-password-hint');
+
+  if (isEdit) {
+    const u = allUsers[index];
+    usernameInput.value = u.username;
+    usernameInput.disabled = true; // No se puede cambiar el username
+    nombreInput.value = u.nombre;
+    passwordInput.value = '';
+    passwordInput.placeholder = 'Dejar vacío para no cambiar';
+    passwordHint.style.display = 'block';
+    rolInput.value = u.rol;
+  } else {
+    usernameInput.value = '';
+    usernameInput.disabled = false;
+    nombreInput.value = '';
+    passwordInput.value = '';
+    passwordInput.placeholder = 'Mínimo 4 caracteres';
+    passwordHint.style.display = 'none';
+    rolInput.value = '';
+  }
+
+  modal.classList.add('open');
+}
+
+function closeUserModal() {
+  document.getElementById('user-modal-overlay').classList.remove('open');
+  editingUserIndex = -1;
+}
+
+async function saveUser() {
+  const isEdit = editingUserIndex >= 0;
+  const username = document.getElementById('user-username').value.trim();
+  const nombre = document.getElementById('user-nombre').value.trim();
+  const password = document.getElementById('user-password').value;
+  const rol = document.getElementById('user-rol').value;
+
+  // Validaciones
+  if (!isEdit && !username) {
+    toast('El usuario es obligatorio', 'error');
+    return;
+  }
+  if (!nombre) {
+    toast('El nombre es obligatorio', 'error');
+    return;
+  }
+  if (!rol) {
+    toast('Selecciona un rol', 'error');
+    return;
+  }
+  if (!isEdit && !password) {
+    toast('La contraseña es obligatoria', 'error');
+    return;
+  }
+  if (password && password.length < 4) {
+    toast('La contraseña debe tener al menos 4 caracteres', 'error');
+    return;
+  }
+
+  showLoading(isEdit ? 'Actualizando usuario...' : 'Creando usuario...');
+
+  try {
+    let res;
+    if (isEdit) {
+      res = await apiCall({
+        action: 'updateUser',
+        requestedBy: currentUser.username,
+        rowIndex: allUsers[editingUserIndex].rowIndex,
+        password: password || '',
+        nombre,
+        rol
+      });
+    } else {
+      res = await apiCall({
+        action: 'addUser',
+        requestedBy: currentUser.username,
+        username,
+        password,
+        nombre,
+        rol
+      });
+    }
+
+    if (res.success) {
+      toast(`✅ ${res.message}`, 'success');
+      closeUserModal();
+      await loadUsers();
+    } else {
+      toast(res.message || 'Error al guardar', 'error');
+    }
+  } catch (e) {
+    toast('Error de conexión', 'error');
+    console.error(e);
+  } finally {
+    hideLoading();
+  }
+}
+
+async function toggleUserStatus(index, newStatus) {
+  const u = allUsers[index];
+  const action = newStatus === 'NO' ? 'desactivar' : 'activar';
+
+  if (!confirm(`¿Estás seguro de ${action} al usuario "${u.username}"?`)) return;
+
+  showLoading(newStatus === 'NO' ? 'Desactivando...' : 'Activando...');
+  try {
+    const res = await apiCall({
+      action: 'toggleUserStatus',
+      requestedBy: currentUser.username,
+      rowIndex: u.rowIndex,
+      newStatus
+    });
+
+    if (res.success) {
+      toast(`✅ ${res.message}`, 'success');
+      await loadUsers();
+    } else {
+      toast(res.message || 'Error al cambiar estado', 'error');
+    }
+  } catch (e) {
+    toast('Error de conexión', 'error');
+    console.error(e);
+  } finally {
+    hideLoading();
+  }
+}

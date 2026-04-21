@@ -1,7 +1,7 @@
 // ============================================================
 // CONFIGURACIÓN
 // ============================================================
-const SPREADSHEET_ID = '1NeEDvg9VM1lMqwTw8KP8dXJb9XaUtJ8XeAT3jWT48mw';
+const SPREADSHEET_ID = '1vmls53Rcv9gth1kOlwcPlRLziVCL94W1X3uGNqTq2-Y';
 const DRIVE_FOLDER_ID = '14nmoC5OWBL_k2VH_xowqmhxuZuYbj604';
 
 // ============================================================
@@ -31,6 +31,19 @@ function doPost(e) {
         break;
       case 'uploadChunk':
         result = handleUploadChunk(data);
+        break;
+      // ── Acciones de administración de usuarios ──
+      case 'getUsers':
+        result = handleGetUsers(data);
+        break;
+      case 'addUser':
+        result = handleAddUser(data);
+        break;
+      case 'updateUser':
+        result = handleUpdateUser(data);
+        break;
+      case 'toggleUserStatus':
+        result = handleToggleUserStatus(data);
         break;
       default:
         result = { success: false, message: 'Acción no reconocida' };
@@ -65,6 +78,12 @@ function handleLogin(data) {
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     if (row[0] === username && row[1] === password) {
+      // Verificar estado activo (columna E, índice 4)
+      // Si la columna no existe o está vacía, se trata como activo (retrocompatibilidad)
+      const activo = (row[4] === undefined || row[4] === '' || String(row[4]).toUpperCase() === 'SI');
+      if (!activo) {
+        return { success: false, message: 'Tu cuenta está desactivada. Contacta al administrador.' };
+      }
       return {
         success: true,
         user: {
@@ -308,6 +327,170 @@ function handleSaveAprobado(data) {
 }
 
 // ============================================================
+// ADMINISTRACIÓN DE USUARIOS
+// ============================================================
+
+// ── Obtener todos los usuarios (solo admin) ──
+function handleGetUsers(data) {
+  const { requestedBy } = data;
+  // Verificar que quien solicita es admin
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Usuarios');
+  const rows = sheet.getDataRange().getValues();
+
+  let isAdmin = false;
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === requestedBy && rows[i][3] === 'admin') {
+      isAdmin = true;
+      break;
+    }
+  }
+  if (!isAdmin) {
+    return { success: false, message: 'No tienes permisos para esta acción' };
+  }
+
+  const users = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (row[0] === '') continue;
+    users.push({
+      username: row[0],
+      password: row[1],
+      nombre: row[2],
+      rol: row[3],
+      activo: (row[4] === undefined || row[4] === '' || String(row[4]).toUpperCase() === 'SI') ? 'SI' : 'NO',
+      rowIndex: i + 1
+    });
+  }
+
+  return { success: true, users };
+}
+
+// ── Agregar nuevo usuario ──
+function handleAddUser(data) {
+  const { requestedBy, username, password, nombre, rol } = data;
+
+  // Verificar permisos de admin
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Usuarios');
+  const rows = sheet.getDataRange().getValues();
+
+  let isAdmin = false;
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === requestedBy && rows[i][3] === 'admin') {
+      isAdmin = true;
+      break;
+    }
+  }
+  if (!isAdmin) {
+    return { success: false, message: 'No tienes permisos para esta acción' };
+  }
+
+  // Validaciones
+  if (!username || !password || !nombre || !rol) {
+    return { success: false, message: 'Todos los campos son obligatorios' };
+  }
+
+  if (password.length < 4) {
+    return { success: false, message: 'La contraseña debe tener al menos 4 caracteres' };
+  }
+
+  if (rol !== 'enfermero' && rol !== 'medico' && rol !== 'admin') {
+    return { success: false, message: 'El rol debe ser enfermero, medico o admin' };
+  }
+
+  // Verificar que no exista el username
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]).toLowerCase() === String(username).toLowerCase()) {
+      return { success: false, message: 'Ya existe un usuario con ese nombre de usuario' };
+    }
+  }
+
+  // Agregar usuario
+  sheet.appendRow([username, password, nombre, rol, 'SI']);
+
+  return { success: true, message: 'Usuario creado correctamente' };
+}
+
+// ── Actualizar usuario existente ──
+function handleUpdateUser(data) {
+  const { requestedBy, rowIndex, password, nombre, rol } = data;
+
+  // Verificar permisos de admin
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Usuarios');
+  const rows = sheet.getDataRange().getValues();
+
+  let isAdmin = false;
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === requestedBy && rows[i][3] === 'admin') {
+      isAdmin = true;
+      break;
+    }
+  }
+  if (!isAdmin) {
+    return { success: false, message: 'No tienes permisos para esta acción' };
+  }
+
+  // Validaciones
+  if (!nombre || !rol) {
+    return { success: false, message: 'Nombre y rol son obligatorios' };
+  }
+
+  if (password && password.length < 4) {
+    return { success: false, message: 'La contraseña debe tener al menos 4 caracteres' };
+  }
+
+  if (rol !== 'enfermero' && rol !== 'medico' && rol !== 'admin') {
+    return { success: false, message: 'Rol no válido' };
+  }
+
+  // Actualizar nombre y rol
+  sheet.getRange(rowIndex, 3).setValue(nombre);
+  sheet.getRange(rowIndex, 4).setValue(rol);
+
+  // Actualizar contraseña solo si se proporcionó una nueva
+  if (password && password.trim() !== '') {
+    sheet.getRange(rowIndex, 2).setValue(password);
+  }
+
+  return { success: true, message: 'Usuario actualizado correctamente' };
+}
+
+// ── Activar/Desactivar usuario ──
+function handleToggleUserStatus(data) {
+  const { requestedBy, rowIndex, newStatus } = data;
+
+  // Verificar permisos de admin
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Usuarios');
+  const rows = sheet.getDataRange().getValues();
+
+  let isAdmin = false;
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === requestedBy && rows[i][3] === 'admin') {
+      isAdmin = true;
+      break;
+    }
+  }
+  if (!isAdmin) {
+    return { success: false, message: 'No tienes permisos para esta acción' };
+  }
+
+  // Verificar que no se desactive a sí mismo
+  const targetUsername = rows[rowIndex - 1][0];
+  if (targetUsername === requestedBy && newStatus === 'NO') {
+    return { success: false, message: 'No puedes desactivar tu propia cuenta' };
+  }
+
+  // Actualizar estado
+  sheet.getRange(rowIndex, 5).setValue(newStatus);
+
+  const statusMsg = newStatus === 'SI' ? 'activado' : 'desactivado';
+  return { success: true, message: 'Usuario ' + statusMsg + ' correctamente' };
+}
+
+// ============================================================
 // INICIALIZACIÓN DE HOJAS Y USUARIOS
 // ⚠️ EJECUTAR ESTA FUNCIÓN MANUALMENTE UNA SOLA VEZ
 // antes de hacer la primera implementación (Deploy):
@@ -323,12 +506,11 @@ function inicializarHojas() {
     usuariosSheet = ss.insertSheet('Usuarios');
   }
   usuariosSheet.clearContents();
-  usuariosSheet.getRange(1, 1, 1, 4).setValues([
-    ['usuario', 'password', 'nombre', 'rol']
+  usuariosSheet.getRange(1, 1, 1, 5).setValues([
+    ['usuario', 'password', 'nombre', 'rol', 'activo']
   ]).setFontWeight('bold');
-  usuariosSheet.getRange(2, 1, 2, 4).setValues([
-    ['enfermero', 'enfermero', 'Enfermero', 'enfermero'],
-    ['medico',    'medico',    'Medico',    'medico'   ]
+  usuariosSheet.getRange(2, 1, 1, 5).setValues([
+    ['admin', 'Previsalud2023++', 'Administrador', 'admin', 'SI']
   ]);
 
   // --- Hoja Electros ---

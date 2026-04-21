@@ -1039,6 +1039,105 @@ tbody tr:hover {
 }
 
 /* ═══════════════════════════════════════════════════
+   ADMIN — Panel de Usuarios
+═══════════════════════════════════════════════════ */
+.avatar-admin {
+  background: #ef6c00;
+}
+
+/* Badges de estado */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-active {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-inactive {
+  background: var(--red-light);
+  color: var(--red);
+}
+
+/* Badges de rol */
+.rol-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rol-medico {
+  background: var(--blue-light);
+  color: var(--blue);
+}
+
+.rol-enfermero {
+  background: var(--teal-light);
+  color: var(--teal-dark);
+}
+
+.rol-admin {
+  background: #fff3e0;
+  color: #ef6c00;
+}
+
+/* Botones de acción */
+.btn-danger-outline {
+  background: var(--red-light);
+  color: var(--red);
+  border: 1.5px solid #ef9a9a;
+}
+
+.btn-danger-outline:hover:not(:disabled) {
+  background: #ffcdd2;
+}
+
+.btn-danger-outline:disabled {
+  background: #f5f5f5;
+  color: #bdbdbd;
+  border-color: #e0e0e0;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.btn-success-outline {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1.5px solid #a5d6a7;
+}
+
+.btn-success-outline:hover {
+  background: #c8e6c9;
+}
+
+/* Fila inactiva */
+.row-inactive td {
+  opacity: 0.55;
+}
+
+.row-inactive:hover td {
+  opacity: 0.75;
+}
+
+/* Hint debajo del input */
+.form-hint {
+  font-size: 11px;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+
+/* ═══════════════════════════════════════════════════
    RESPONSIVE
 ═══════════════════════════════════════════════════ */
 @media (max-width: 680px) {
