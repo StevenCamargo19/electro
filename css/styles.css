@@ -1504,6 +1504,7 @@ tbody tr:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 16px;
+  padding-top: 48px;
   margin-bottom: 12px;
   position: relative;
   animation: fadeUp 0.2s ease;
@@ -1536,14 +1537,17 @@ tbody tr:hover {
 
 .question-card-body {
   display: flex;
+  flex-direction: column;
   gap: 10px;
   align-items: flex-start;
-  flex-wrap: wrap;
+}
+
+.question-card-body > select {
+  width: 200px;
 }
 
 .question-card-body .form-input {
-  flex: 1;
-  min-width: 140px;
+  width: 100%;
 }
 
 .question-delete {
@@ -1566,6 +1570,28 @@ tbody tr:hover {
 
 .question-delete:hover {
   background: #ffcdd2;
+}
+
+.options-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.option-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.option-item .form-input {
+  flex: 9;
+}
+
+.option-item .btn {
+  flex: 1;
+  max-width: 40px;
 }
 
 /* Survey cards (enfermero view) */

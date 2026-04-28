@@ -1680,7 +1680,7 @@ function renderQuestionsBuilder() {
           value="${q.pregunta}" onchange="updateQuestion(${i}, 'pregunta', this.value)">
       </div>
       <div class="question-card-body">
-        <select class="form-input" style="width:160px" onchange="updateQuestionType(${i}, this.value)">
+        <select class="form-input" style="width:200px" onchange="updateQuestionType(${i}, this.value)">
           <option value="texto" ${q.tipo === 'texto' ? 'selected' : ''}>Texto</option>
           <option value="radio" ${q.tipo === 'radio' ? 'selected' : ''}>Opción múltiple (una)</option>
           <option value="checkbox" ${q.tipo === 'checkbox' ? 'selected' : ''}>Opción múltiple (varias)</option>
@@ -1688,8 +1688,8 @@ function renderQuestionsBuilder() {
           <option value="textarea" ${q.tipo === 'textarea' ? 'selected' : ''}>Texto largo</option>
         </select>
         ${(q.tipo === 'radio' || q.tipo === 'checkbox') ? `
-          <div class="options-builder" style="flex:1;display:flex;flex-direction:column;gap:6px;margin-top:8px;">
-            <div style="font-size:11px;color:var(--text-2);text-transform:uppercase;font-weight:600;">Opciones</div>
+          <div class="options-builder">
+            <div style="font-size:11px;color:var(--text-2);text-transform:uppercase;font-weight:600;margin-bottom:6px;">Opciones</div>
             ${(q.opciones || []).map((opt, oi) => `
               <div class="option-item">
                 <input class="form-input" type="text" value="${opt}"
@@ -1890,9 +1890,91 @@ function renderResponsesTable(responses, survey) {
   `).join('');
 }
 
+function viewResponseDetail(id) {
+  const tbody = document.getElementById('responses-table-body');
+  const rows = tbody.querySelectorAll('tr');
+  let response = null;
+  
+  for (let row of rows) {
+    const btn = row.querySelector('button');
+    if (btn && btn.onclick.toString().includes(id)) {
+      const cells = row.querySelectorAll('td');
+      if (cells.length >= 2) {
+        const responses = currentSurveyRespData;
+        response = responses.find(r => r.id === id);
+        break;
+      }
+    }
+  }
+  
+  if (!response) {
+    toast('Respuesta no encontrada', 'error');
+    return;
+  }
+  
+  let html = `<div style="max-width:500px;padding:20px">
+    <h3 style="margin-bottom:16px">📋 Respuesta de ${response.respondidoPor}</h3>
+    <p style="color:var(--text-2);margin-bottom:16px">📅 ${response.fechaRespuesta}</p>`;
+  
+  if (response.respuestas && Array.isArray(response.respuestas)) {
+    response.respuestas.forEach((resp, i) => {
+      html += `<div style="margin-bottom:12px;padding:12px;background:var(--bg-2);border-radius:8px">
+        <div style="font-weight:600;margin-bottom:4px">${i + 1}. ${resp.pregunta}</div>
+        <div style="color:var(--text-2)">${resp.respuesta || '(sin respuesta)'}</div>
+      </div>`;
+    });
+  } else if (response.respuestas) {
+    const respuestas = JSON.parse(response.respuestas);
+    if (Array.isArray(respuestas)) {
+      respuestas.forEach((resp, i) => {
+        html += `<div style="margin-bottom:12px;padding:12px;background:var(--bg-2);border-radius:8px">
+          <div style="font-weight:600;margin-bottom:4px">${i + 1}. ${resp.pregunta}</div>
+          <div style="color:var(--text-2)">${resp.respuesta || '(sin respuesta)'}</div>
+        </div>`;
+      });
+    }
+  }
+  
+  html += `<button class="btn btn-secondary" onclick="this.closest('.modal-box')?.remove();document.getElementById('modal-overlay')?.remove();" style="margin-top:16px">Cerrar</button></div>`;
+  
+  showModal(html);
+}
+
+function showModal(content) {
+  const modal = document.getElementById('modal-overlay');
+  const body = modal.querySelector('.modal-body');
+  body.innerHTML = content;
+  modal.classList.add('open');
+}
+
 function backToSurveyAdmin() {
   currentSurvey = null;
   surveyQuestions = [];
+  currentSurveyRespData = [];
+  document.getElementById('sup-survey-form').style.display = 'none';
+  document.getElementById('sup-survey-responses').style.display = 'none';
+  document.getElementById('sup-surveys-list').style.display = 'block';
+  loadSurveys();
+}
+
+let currentSurveyRespData = [];
+
+async function loadSurveyResponses(id, survey) {
+  try {
+    const res = await apiCall({ action: 'getSurveyResponses', encuestaId: id });
+    if (res.success) {
+      currentSurveyRespData = res.responses || [];
+      renderResponsesTable(currentSurveyRespData, survey);
+    }
+  } catch (e) {
+    toast('Error de conexión', 'error');
+  }
+}
+
+function backToSurveyAdmin() {
+  currentSurvey = null;
+  surveyQuestions = [];
+  currentSurveyRespData = [];
   document.getElementById('sup-survey-form').style.display = 'none';
   document.getElementById('sup-survey-responses').style.display = 'none';
   document.getElementById('sup-surveys-list').style.display = 'block';
@@ -1901,7 +1983,7 @@ function backToSurveyAdmin() {
 
 // ═══════════════════════════════════════════════════════════════
 // ENFERMERO — Encuestas
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 let currentEnfSurvey = null;
 let enfSurveyResponses = {};
 
