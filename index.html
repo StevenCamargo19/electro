@@ -107,6 +107,9 @@
           <button class="tab-btn" id="tab-btn-records" onclick="showTab('my-records', this)">
             ☰ Mis Registros
           </button>
+          <button class="tab-btn" id="tab-btn-encuestas-enf" onclick="showTab('encuestas', this)">
+            📝 Encuestas
+          </button>
         </div>
 
         <!-- Panel: Subir -->
@@ -203,6 +206,27 @@
             </table>
           </div>
         </div>
+
+        <!-- Panel: Encuestas (Enfermero) -->
+        <div id="panel-encuestas-enf" class="panel">
+          <div id="enf-surveys-list">
+            <h3 class="section-title">Encuestas Pendientes</h3>
+            <p class="section-desc">Completa las encuestas asignadas por tu supervisor.</p>
+            <div id="enf-surveys-cards"></div>
+          </div>
+          <div id="enf-survey-form" style="display:none">
+            <button class="btn btn-sm btn-secondary" onclick="backToEnfSurveysList()" style="margin-bottom:16px">←
+              Volver a encuestas</button>
+            <div class="form-card" style="max-width:720px">
+              <h3 class="section-title" id="enf-survey-title"></h3>
+              <p class="section-desc" id="enf-survey-desc"></p>
+              <div id="enf-survey-questions"></div>
+              <div class="form-actions" style="margin-top:20px">
+                <button class="btn btn-primary" onclick="submitEnfSurveyResponse()">📤 Enviar Respuesta</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ── VISTA MÉDICO ── -->
@@ -271,6 +295,7 @@
               <option value="enfermero">Enfermero</option>
               <option value="medico">Médico</option>
               <option value="admin">Admin</option>
+              <option value="supervisor">Supervisor</option>
             </select>
             <input class="search-box" id="search-user" type="text" placeholder="🔍 Buscar usuario o nombre..."
               oninput="filterUsers()">
@@ -299,12 +324,234 @@
         </div>
       </div>
 
+      <!-- ── VISTA SUPERVISOR ── -->
+      <div id="view-supervisor" style="display:none">
+
+        <div class="tab-bar">
+          <button class="tab-btn active" id="tab-btn-dashboard" onclick="showSupervisorTab('dashboard', this)">
+            📊 Dashboard
+          </button>
+          <button class="tab-btn" id="tab-btn-reportes" onclick="showSupervisorTab('reportes', this)">
+            📋 Reportes
+          </button>
+          <button class="tab-btn" id="tab-btn-encuestas-sup" onclick="showSupervisorTab('encuestas', this)">
+            📝 Encuestas
+          </button>
+        </div>
+
+        <!-- Panel: Dashboard -->
+        <div id="panel-dashboard" class="panel active">
+          <div class="records-header" style="margin-bottom:16px">
+            <div>
+              <h3 class="section-title">Dashboard</h3>
+              <p class="section-desc" style="margin-bottom:0">Resumen general del sistema de electrocardiogramas.</p>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <div class="date-range-group">
+                <span class="date-range-label">Desde</span>
+                <input class="search-box" type="date" id="dash-fecha-desde" onchange="filterDashboard()"
+                  style="min-width:auto; width:155px;" onclick="this.showPicker()">
+              </div>
+              <div class="date-range-group">
+                <span class="date-range-label">Hasta</span>
+                <input class="search-box" type="date" id="dash-fecha-hasta" onchange="filterDashboard()"
+                  style="min-width:auto; width:155px;" onclick="this.showPicker()">
+              </div>
+              <button class="btn btn-sm btn-secondary" onclick="clearDashboardFilter()">✕ Limpiar</button>
+            </div>
+          </div>
+
+          <div class="kpi-grid" id="kpi-grid"></div>
+
+          <div class="charts-grid">
+            <div class="chart-card">
+              <h4 class="chart-title" id="chart-bar-title">📈 ECG subidos por día (últimos 7 días)</h4>
+              <div class="chart-wrap">
+                <canvas id="chart-bar"></canvas>
+              </div>
+            </div>
+            <div class="chart-card">
+              <h4 class="chart-title">🎯 Distribución de estados</h4>
+              <div class="chart-wrap">
+                <canvas id="chart-donut"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <h4 class="chart-title">👥 ECG por enfermero</h4>
+            <div class="chart-wrap">
+              <canvas id="chart-enfermeros"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel: Reportes -->
+        <div id="panel-reportes" class="panel">
+          <div class="records-header">
+            <div>
+              <h3 class="section-title">Reportes de Electrocardiogramas</h3>
+              <p class="section-desc" style="margin-bottom:0">Consulta y filtra los registros por fecha, enfermero o
+                estado.</p>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <div class="date-range-group">
+                <span class="date-range-label">Desde</span>
+                <input class="search-box" type="date" id="sup-fecha-desde" onchange="filterRecords()"
+                  style="min-width:auto; width:155px;" onclick="this.showPicker()">
+              </div>
+              <div class="date-range-group">
+                <span class="date-range-label">Hasta</span>
+                <input class="search-box" type="date" id="sup-fecha-hasta" onchange="filterRecords()"
+                  style="min-width:auto; width:155px;" onclick="this.showPicker()">
+              </div>
+              <select class="search-box" id="filtro-enfermero-sup" onchange="filterRecords()"
+                style="min-width:auto; width:180px;">
+                <option value="todos">Todos los enfermeros</option>
+              </select>
+              <select class="search-box" id="filtro-general-sup" onchange="filterRecords()"
+                style="min-width:auto; width:180px;">
+                <option value="todos">Todos los electros</option>
+                <option value="sin-estado">Sin estado registrado</option>
+                <option value="aprobados">Aprobados</option>
+                <option value="no-aprobados">No Aprobados</option>
+                <option value="con-observacion">Con observación</option>
+                <option value="sin-observacion">Sin observación</option>
+              </select>
+              <input class="search-box" id="search-sup" type="text" placeholder="🔍 Buscar paciente o cédula..."
+                oninput="filterRecords()">
+            </div>
+          </div>
+          <div id="sup-report-summary"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Paciente</th>
+                  <th>Cédula</th>
+                  <th data-sort="fechaElectro">Fecha Electro</th>
+                  <th data-sort="fechaSubida">Fecha Subida</th>
+                  <th>Subido por</th>
+                  <th>Archivo</th>
+                  <th>Estado</th>
+                  <th>Observación</th>
+                  <th>Detalle</th>
+                </tr>
+              </thead>
+              <tbody id="sup-table-body">
+                <tr>
+                  <td colspan="9" class="loading-row">Cargando...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Panel: Encuestas (Supervisor) -->
+        <div id="panel-encuestas-sup" class="panel">
+          <!-- Vista: Lista de encuestas -->
+          <div id="sup-surveys-list">
+            <div class="records-header">
+              <div>
+                <h3 class="section-title">Encuestas</h3>
+                <p class="section-desc" style="margin-bottom:0">Crea y gestiona encuestas para los enfermeros.</p>
+              </div>
+              <button class="btn btn-primary" onclick="showCreateSurvey()">➕ Nueva Encuesta</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Título</th>
+                    <th>Creada por</th>
+                    <th>Fecha</th>
+                    <th>Estado</th>
+                    <th>Respuestas</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="surveys-table-body">
+                  <tr>
+                    <td colspan="6" class="loading-row">Cargando...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Vista: Crear/Editar encuesta -->
+          <div id="sup-survey-form" style="display:none">
+            <button class="btn btn-sm btn-secondary" onclick="backToSurveyAdmin()" style="margin-bottom:16px">←
+              Volver</button>
+            <div class="form-card" style="max-width:780px">
+              <h3 class="section-title">Nueva Encuesta</h3>
+              <div class="form-grid" style="margin-bottom:16px">
+                <div class="form-field full">
+                  <label class="form-label">Título *</label>
+                  <input class="form-input" type="text" id="survey-titulo" placeholder="Ej: Encuesta de satisfacción">
+                </div>
+                <div class="form-field full">
+                  <label class="form-label">Descripción</label>
+                  <textarea class="form-input" id="survey-desc" rows="2"
+                    placeholder="Descripción breve de la encuesta"></textarea>
+                </div>
+              </div>
+              <h4 style="font-size:14px;font-weight:600;margin-bottom:12px;color:var(--text)">Preguntas</h4>
+              <div id="survey-questions-builder"></div>
+              <button class="btn btn-sm btn-teal-outline" onclick="addQuestion()" style="margin:12px 0">➕ Agregar
+                Pregunta</button>
+              <div class="form-actions">
+                <button class="btn btn-primary" onclick="saveSurvey()">💾 Guardar Encuesta</button>
+                <button class="btn btn-secondary" onclick="backToSurveyAdmin()">Cancelar</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vista: Respuestas de una encuesta -->
+          <div id="sup-survey-responses" style="display:none">
+            <button class="btn btn-sm btn-secondary" onclick="backToSurveyAdmin()" style="margin-bottom:16px">←
+              Volver</button>
+            <h3 class="section-title" id="responses-survey-title"></h3>
+            <p class="section-desc" id="responses-survey-desc"></p>
+            <div id="responses-summary"></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Respondido por</th>
+                    <th>Fecha</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="responses-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </main>
+  </div>
+
+  <div class="modal-overlay" id="confirm-modal" style="display:none">
+    <div class="modal-box" style="max-width:400px">
+      <div class="modal-header">
+        <h4 class="modal-title" id="confirm-title">Confirmar</h4>
+        <button class="modal-close" onclick="closeConfirmModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-message" style="margin-bottom:20px">¿Estás seguro?</p>
+        <div class="form-actions" style="justify-content:center">
+          <button class="btn btn-secondary" onclick="closeConfirmModal()">Cancelar</button>
+          <button class="btn btn-primary" id="confirm-ok-btn">Aceptar</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ══════════════════════════════════════════════
      MODAL DETALLE
-══════════════════════════════════════════════ -->
+  ══════════════════════════════════════════════ -->
   <div class="modal-overlay" id="modal-overlay">
     <div class="modal-box">
       <div class="modal-header">
@@ -360,6 +607,7 @@
                 <option value="enfermero">Enfermero/a</option>
                 <option value="medico">Médico</option>
                 <option value="admin">Administrador</option>
+                <option value="supervisor">Supervisor</option>
               </select>
             </div>
           </div>
@@ -372,6 +620,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <script src="js/app.js"></script>
 
   <script>

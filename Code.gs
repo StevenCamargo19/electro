@@ -45,6 +45,28 @@ function doPost(e) {
       case 'toggleUserStatus':
         result = handleToggleUserStatus(data);
         break;
+      // ── Acciones de encuestas ──
+      case 'createSurvey':
+        result = handleCreateSurvey(data);
+        break;
+      case 'getSurveys':
+        result = handleGetSurveys(data);
+        break;
+      case 'submitSurveyResponse':
+        result = handleSubmitSurveyResponse(data);
+        break;
+      case 'getSurveyResponses':
+        result = handleGetSurveyResponses(data);
+        break;
+      case 'toggleSurvey':
+        result = handleToggleSurvey(data);
+        break;
+      case 'deleteSurvey':
+        result = handleDeleteSurvey(data);
+        break;
+      case 'updateSurvey':
+        result = handleUpdateSurvey(data);
+        break;
       default:
         result = { success: false, message: 'Acción no reconocida' };
     }
@@ -296,7 +318,7 @@ function handleGetRecords(data) {
       rowIndex: i + 1
     };
 
-    if (rol === 'medico' || (rol === 'enfermero' && record.subidoPor === username)) {
+    if (rol === 'medico' || rol === 'supervisor' || (rol === 'enfermero' && record.subidoPor === username)) {
       records.push(record);
     }
   }
@@ -395,8 +417,8 @@ function handleAddUser(data) {
     return { success: false, message: 'La contraseña debe tener al menos 4 caracteres' };
   }
 
-  if (rol !== 'enfermero' && rol !== 'medico' && rol !== 'admin') {
-    return { success: false, message: 'El rol debe ser enfermero, medico o admin' };
+  if (rol !== 'enfermero' && rol !== 'medico' && rol !== 'admin' && rol !== 'supervisor') {
+    return { success: false, message: 'El rol debe ser enfermero, medico, admin o supervisor' };
   }
 
   // Verificar que no exista el username
@@ -441,7 +463,7 @@ function handleUpdateUser(data) {
     return { success: false, message: 'La contraseña debe tener al menos 4 caracteres' };
   }
 
-  if (rol !== 'enfermero' && rol !== 'medico' && rol !== 'admin') {
+  if (rol !== 'enfermero' && rol !== 'medico' && rol !== 'admin' && rol !== 'supervisor') {
     return { success: false, message: 'Rol no válido' };
   }
 
@@ -524,4 +546,222 @@ function inicializarHojas() {
   ]]).setFontWeight('bold');
 
   Logger.log('✅ Hojas inicializadas correctamente');
+}
+
+// ============================================================
+// ENCUESTAS
+// ============================================================
+
+function ensureSheet(ss, name, headers) {
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+  }
+  return sheet;
+}
+
+function handleCreateSurvey(data) {
+  var titulo = data.titulo;
+  var descripcion = data.descripcion || '';
+  var preguntas = data.preguntas;
+  var creadaPor = data.creadaPor;
+
+  if (!titulo || !preguntas || !creadaPor) {
+    return { success: false, message: 'Campos obligatorios faltantes' };
+  }
+
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ensureSheet(ss, 'Encuestas', ['id','titulo','descripcion','preguntas','creadaPor','fechaCreacion','activa']);
+
+  var tz = 'America/Bogota';
+  var id = Utilities.getUuid();
+  var fechaCreacion = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy hh:mm:ss a');
+
+  sheet.appendRow([id, titulo, descripcion, JSON.stringify(preguntas), creadaPor, fechaCreacion, 'SI']);
+
+  return { success: true, message: 'Encuesta creada correctamente' };
+}
+
+function handleGetSurveys(data) {
+  var rol = data.rol;
+  var username = data.username;
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName('Encuestas');
+
+  if (!sheet) return { success: true, surveys: [] };
+
+  var rows = sheet.getDataRange().getValues();
+  var respSheet = ss.getSheetByName('Respuestas');
+  var respRows = respSheet ? respSheet.getDataRange().getValues() : [];
+
+  var surveys = [];
+  for (var i = 1; i < rows.length; i++) {
+    var row = rows[i];
+    if (row[0] === '') continue;
+
+    var activa = row[6] === 'SI';
+
+    // Enfermeros solo ven encuestas activas
+    if (rol === 'enfermero' && !activa) continue;
+
+    var fechaStr = row[5];
+    if (fechaStr instanceof Date) {
+      fechaStr = Utilities.formatDate(fechaStr, 'America/Bogota', 'dd/MM/yyyy hh:mm:ss a');
+    }
+
+    var totalResp = 0;
+    var yaRespondio = false;
+    for (var j = 1; j < respRows.length; j++) {
+      if (respRows[j][1] === row[0]) {
+        totalResp++;
+        if (respRows[j][2] === username) yaRespondio = true;
+      }
+    }
+
+    surveys.push({
+      id: row[0],
+      titulo: row[1],
+      descripcion: row[2],
+      preguntas: JSON.parse(row[3] || '[]'),
+      creadaPor: row[4],
+      fechaCreacion: fechaStr,
+      activa: activa,
+      totalRespuestas: totalResp,
+      yaRespondio: yaRespondio,
+      rowIndex: i + 1
+    });
+  }
+
+  return { success: true, surveys: surveys };
+}
+
+function handleSubmitSurveyResponse(data) {
+  var encuestaId = data.encuestaId;
+  var respondidoPor = data.respondidoPor;
+  var respuestas = data.respuestas;
+
+  if (!encuestaId || !respondidoPor || !respuestas) {
+    return { success: false, message: 'Datos incompletos' };
+  }
+
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ensureSheet(ss, 'Respuestas', ['id','encuestaId','respondidoPor','fechaRespuesta','respuestas']);
+
+  // Verificar si ya respondio
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][1] === encuestaId && rows[i][2] === respondidoPor) {
+      return { success: false, message: 'Ya respondiste esta encuesta' };
+    }
+  }
+
+  var tz = 'America/Bogota';
+  var id = Utilities.getUuid();
+  var fecha = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy hh:mm:ss a');
+
+  sheet.appendRow([id, encuestaId, respondidoPor, fecha, JSON.stringify(respuestas)]);
+
+  return { success: true, message: 'Respuesta enviada correctamente' };
+}
+
+function handleGetSurveyResponses(data) {
+  var encuestaId = data.encuestaId;
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName('Respuestas');
+
+  if (!sheet) return { success: true, responses: [] };
+
+  var rows = sheet.getDataRange().getValues();
+  var responses = [];
+  for (var i = 1; i < rows.length; i++) {
+    var row = rows[i];
+    if (row[1] !== encuestaId) continue;
+
+    var fechaStr = row[3];
+    if (fechaStr instanceof Date) {
+      fechaStr = Utilities.formatDate(fechaStr, 'America/Bogota', 'dd/MM/yyyy hh:mm:ss a');
+    }
+
+    responses.push({
+      id: row[0],
+      encuestaId: row[1],
+      respondidoPor: row[2],
+      fechaRespuesta: fechaStr,
+      respuestas: JSON.parse(row[4] || '[]')
+    });
+  }
+
+  return { success: true, responses: responses };
+}
+
+function handleToggleSurvey(data) {
+  var rowIndex = data.rowIndex;
+  var activa = data.activa;
+
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName('Encuestas');
+  sheet.getRange(rowIndex, 7).setValue(activa ? 'SI' : 'NO');
+
+  return { success: true, message: activa ? 'Encuesta activada' : 'Encuesta desactivada' };
+}
+
+function handleDeleteSurvey(data) {
+  var id = data.id;
+  var debugLog = [];
+  
+  debugLog.push('handleDeleteSurvey called with id: ' + id);
+  
+  if (!id) return { success: false, message: 'ID no proporcionado', debug: debugLog };
+  
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName('Encuestas');
+
+  if (!sheet) {
+    debugLog.push('ERROR: Sheet Encuestas not found');
+    return { success: false, message: 'Hoja no encontrada', debug: debugLog };
+  }
+
+  var rows = sheet.getDataRange().getValues();
+  debugLog.push('Total rows in Encuestas: ' + rows.length);
+  debugLog.push('Looking for ID: ' + id);
+  
+  for (var i = 1; i < rows.length; i++) {
+    var rowId = String(rows[i][0]);
+    debugLog.push('Row ' + i + ': "' + rowId + '" === "' + id + '" = ' + (rowId === id));
+    if (rowId === id) {
+      debugLog.push('FOUND! Deleting row ' + (i + 1));
+      sheet.deleteRow(i + 1);
+      return { success: true, message: 'Encuesta eliminada', debug: debugLog };
+    }
+  }
+
+  debugLog.push('NOT FOUND - ID does not match any row');
+  return { success: false, message: 'Encuesta no encontrada', debug: debugLog };
+}
+
+function handleUpdateSurvey(data) {
+  var id = data.id;
+  var titulo = data.titulo;
+  var descripcion = data.descripcion || '';
+  var preguntas = data.preguntas;
+
+  if (!id || !titulo || !preguntas) {
+    return { success: false, message: 'Campos obligatorios faltantes' };
+  }
+
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName('Encuestas');
+  var rows = sheet.getDataRange().getValues();
+
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][0] === id) {
+      sheet.getRange(i + 1, 2).setValue(titulo);
+      sheet.getRange(i + 1, 3).setValue(descripcion);
+      sheet.getRange(i + 1, 4).setValue(JSON.stringify(preguntas));
+      return { success: true, message: 'Encuesta actualizada' };
+    }
+  }
+
+  return { success: false, message: 'Encuesta no encontrada' };
 }

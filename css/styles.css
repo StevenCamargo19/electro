@@ -1254,3 +1254,484 @@ tbody tr:hover {
   color: var(--text-2);
   padding: 0 4px;
 }
+
+/* ═══════════════════════════════════════════════════
+   SUPERVISOR — Dashboard & Reportes
+═══════════════════════════════════════════════════ */
+.avatar-supervisor {
+  background: #7b1fa2;
+}
+
+.rol-supervisor {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+/* KPI Grid */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.kpi-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s, box-shadow 0.2s;
+  position: relative;
+  overflow: hidden;
+  animation: fadeUp 0.35s ease both;
+}
+
+.kpi-card:nth-child(2) {
+  animation-delay: 0.06s;
+}
+
+.kpi-card:nth-child(3) {
+  animation-delay: 0.12s;
+}
+
+.kpi-card:nth-child(4) {
+  animation-delay: 0.18s;
+}
+
+.kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+
+.kpi-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+
+.kpi-total::after {
+  background: linear-gradient(90deg, #7b1fa2, #ab47bc);
+}
+
+.kpi-aprobados::after {
+  background: linear-gradient(90deg, #2e7d32, #66bb6a);
+}
+
+.kpi-rechazados::after {
+  background: linear-gradient(90deg, #c62828, #ef5350);
+}
+
+.kpi-pendientes::after {
+  background: linear-gradient(90deg, #e65100, #ff9800);
+}
+
+.kpi-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.kpi-total .kpi-icon {
+  background: #f3e5f5;
+}
+
+.kpi-aprobados .kpi-icon {
+  background: #e8f5e9;
+}
+
+.kpi-rechazados .kpi-icon {
+  background: var(--red-light);
+}
+
+.kpi-pendientes .kpi-icon {
+  background: #fff3e0;
+}
+
+.kpi-value {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.kpi-pct {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.6;
+}
+
+.kpi-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-2);
+}
+
+/* Charts Grid */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.chart-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 16px;
+  animation: fadeUp 0.35s ease both;
+  animation-delay: 0.2s;
+  overflow: hidden;
+}
+
+.charts-grid .chart-card {
+  margin-bottom: 0;
+}
+
+.chart-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 16px;
+}
+
+.chart-wrap {
+  position: relative;
+  width: 100%;
+  max-height: 280px;
+}
+
+.chart-wrap canvas {
+  max-height: 280px !important;
+  width: 100% !important;
+}
+
+/* Report summary bar */
+.report-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: #f3e5f5;
+  border: 1px solid #ce93d8;
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: #4a148c;
+  font-weight: 500;
+  flex-wrap: wrap;
+  animation: fadeUp 0.25s ease;
+}
+
+.report-summary-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.report-summary-divider {
+  width: 1px;
+  height: 16px;
+  background: #ce93d8;
+}
+
+/* Date range inputs */
+.date-range-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.date-range-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+/* Responsive — Supervisor */
+@media (max-width: 900px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .kpi-card {
+    padding: 14px;
+  }
+
+  .kpi-value {
+    font-size: 22px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   ENCUESTAS — Estilos
+═══════════════════════════════════════════════════ */
+
+/* Question builder card */
+.question-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  position: relative;
+  animation: fadeUp 0.2s ease;
+}
+
+.question-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.question-number {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #7b1fa2;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.question-card-header .form-input {
+  flex: 1;
+}
+
+.question-card-body {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.question-card-body .form-input {
+  flex: 1;
+  min-width: 140px;
+}
+
+.question-delete {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: var(--red-light);
+  color: var(--red);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.question-delete:hover {
+  background: #ffcdd2;
+}
+
+/* Survey cards (enfermero view) */
+.survey-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s, box-shadow 0.2s;
+  animation: fadeUp 0.25s ease both;
+}
+
+.survey-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.survey-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.survey-card-header h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.survey-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.survey-pending {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.survey-completed {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.survey-inactive {
+  background: var(--red-light);
+  color: var(--red);
+}
+
+.survey-active {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.survey-desc {
+  font-size: 13px;
+  color: var(--text-2);
+  margin-bottom: 10px;
+}
+
+.survey-meta {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-bottom: 14px;
+}
+
+/* Enfermero survey form question */
+.survey-question {
+  margin-bottom: 18px;
+}
+
+.survey-question-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.survey-question-label .required-mark {
+  color: var(--red);
+  font-weight: 700;
+}
+
+.survey-radio-group,
+.survey-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.survey-radio-group label,
+.survey-checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  transition: background 0.15s;
+}
+
+.survey-radio-group label:hover,
+.survey-checkbox-group label:hover {
+  background: var(--teal-light);
+}
+
+/* Response detail card */
+.response-detail {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.response-detail h5 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin-bottom: 4px;
+}
+
+.response-detail p {
+  font-size: 14px;
+  color: var(--text);
+}
+
+/* Empty surveys state */
+.surveys-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-2);
+}
+
+.surveys-empty .empty-icon {
+  font-size: 36px;
+  margin-bottom: 10px;
+}
+
+.surveys-empty .empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+/* Type badge in question builder */
+.type-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: #f3e5f5;
+  color: #7b1fa2;
+}

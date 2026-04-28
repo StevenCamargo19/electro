@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // CONFIGURACIÓN — Reemplaza con tu URL de Google Apps Script
 // ═══════════════════════════════════════════════════════════════
-const API_URL = 'https://script.google.com/macros/s/AKfycbzrclzYxBgrzsRtV_KwXoJUvLuNwDo0c6InmoGPFD0ditSKTioQEXtGQ-7GxlkUahwG/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwY_qVR1m8bX4ocfw8wpvCmxXEnUOy2pfEJcIK-TI5aWzF8AeZzmTPztDnOqCUpnpTBuw/exec';
 
 // ═══════════════════════════════════════════════════════════════
 // ESTADO GLOBAL
@@ -9,6 +9,11 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbzrclzYxBgrzsRtV_KwXoJU
 let currentUser = null;
 let allRecords = [];
 let currentRecord = null;
+
+// Supervisor: Chart instances
+let chartBar = null;
+let chartDonut = null;
+let chartEnfermeros = null;
 
 // Admin: lista de usuarios
 let allUsers = [];
@@ -198,20 +203,29 @@ function enterApp() {
 
   // Header
   document.getElementById('user-name-display').textContent = currentUser.nombre;
-  document.getElementById('user-rol-display').textContent =
-    currentUser.rol === 'medico' ? '🩺 Médico' :
-    currentUser.rol === 'admin' ? '⚙️ Administrador' : '🏥 Enfermero/a';
+  const rolLabels = {
+    medico: '🩺 Médico',
+    admin: '⚙️ Administrador',
+    supervisor: '📊 Supervisor',
+    enfermero: '🏥 Enfermero/a'
+  };
+  document.getElementById('user-rol-display').textContent = rolLabels[currentUser.rol] || currentUser.rol;
 
   const av = document.getElementById('user-avatar');
   av.textContent = currentUser.nombre.charAt(0).toUpperCase();
-  av.className = 'user-avatar ' +
-    (currentUser.rol === 'medico' ? 'avatar-medico' :
-     currentUser.rol === 'admin' ? 'avatar-admin' : 'avatar-enfermero');
+  const avatarClasses = {
+    medico: 'avatar-medico',
+    admin: 'avatar-admin',
+    supervisor: 'avatar-supervisor',
+    enfermero: 'avatar-enfermero'
+  };
+  av.className = 'user-avatar ' + (avatarClasses[currentUser.rol] || 'avatar-enfermero');
 
   // Ocultar todas las vistas antes de decidir cuál mostrar
   document.getElementById('view-medico').style.display = 'none';
   document.getElementById('view-enfermero').style.display = 'none';
   document.getElementById('view-admin').style.display = 'none';
+  document.getElementById('view-supervisor').style.display = 'none';
 
   if (currentUser.rol === 'admin') {
     document.getElementById('view-admin').style.display = 'block';
@@ -219,6 +233,9 @@ function enterApp() {
   } else if (currentUser.rol === 'medico') {
     document.getElementById('view-medico').style.display = 'block';
     loadRecords();
+  } else if (currentUser.rol === 'supervisor') {
+    document.getElementById('view-supervisor').style.display = 'block';
+    loadSupervisorData();
   } else if (currentUser.rol === 'enfermero') {
     document.getElementById('view-enfermero').style.display = 'block';
     document.getElementById('up-fecha').value = new Date().toLocaleDateString('en-CA');
@@ -232,14 +249,20 @@ function enterApp() {
 // TABS — Enfermero
 // ═══════════════════════════════════════════════════════════════
 function showTab(tab, btnEl) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#view-enfermero .tab-btn').forEach(b => b.classList.remove('active'));
   btnEl.classList.add('active');
 
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  const panelId = tab === 'upload' ? 'panel-upload' : 'panel-my-records';
-  document.getElementById(panelId).classList.add('active');
+  document.querySelectorAll('#view-enfermero .panel').forEach(p => p.classList.remove('active'));
 
-  if (tab === 'my-records') loadRecords();
+  if (tab === 'upload') {
+    document.getElementById('panel-upload').classList.add('active');
+  } else if (tab === 'my-records') {
+    document.getElementById('panel-my-records').classList.add('active');
+    loadRecords();
+  } else if (tab === 'encuestas') {
+    document.getElementById('panel-encuestas-enf').classList.add('active');
+    loadEnfSurveys();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -445,8 +468,19 @@ function updateSortIndicators() {
 
 function filterRecords() {
   const isMedico = currentUser.rol === 'medico';
-  const searchEl = document.getElementById(isMedico ? 'search-med' : 'search-enf');
-  const filtroEl = document.getElementById(isMedico ? 'filtro-general-med' : 'filtro-general-enf');
+  const isSupervisor = currentUser.rol === 'supervisor';
+
+  let searchEl, filtroEl;
+  if (isSupervisor) {
+    searchEl = document.getElementById('search-sup');
+    filtroEl = document.getElementById('filtro-general-sup');
+  } else if (isMedico) {
+    searchEl = document.getElementById('search-med');
+    filtroEl = document.getElementById('filtro-general-med');
+  } else {
+    searchEl = document.getElementById('search-enf');
+    filtroEl = document.getElementById('filtro-general-enf');
+  }
 
   const q = (searchEl?.value || '').toLowerCase().trim();
   const filtro = filtroEl?.value || 'todos';
@@ -475,15 +509,49 @@ function filterRecords() {
     filtered = filtered.filter(r => !r.observacion || !r.observacion.trim());
   }
 
+  // Filtros adicionales del supervisor: rango de fechas y enfermero
+  if (isSupervisor) {
+    const desde = document.getElementById('sup-fecha-desde')?.value;
+    const hasta = document.getElementById('sup-fecha-hasta')?.value;
+    if (desde) {
+      const desdeDate = new Date(desde + 'T00:00:00');
+      filtered = filtered.filter(r => parseDateForSort(r.fechaElectro) >= desdeDate);
+    }
+    if (hasta) {
+      const hastaDate = new Date(hasta + 'T23:59:59');
+      filtered = filtered.filter(r => parseDateForSort(r.fechaElectro) <= hastaDate);
+    }
+    const enfFilter = document.getElementById('filtro-enfermero-sup')?.value || 'todos';
+    if (enfFilter !== 'todos') {
+      filtered = filtered.filter(r => r.subidoPor === enfFilter);
+    }
+  }
+
   currentPage = 1;
   currentList = sortList(filtered);
   renderTable(currentList, !q && filtro === 'todos');
+
+  // Actualizar resumen del reporte (supervisor)
+  if (isSupervisor) {
+    renderReportSummary(filtered);
+  }
 }
 
 function renderTable(records, isFullList) {
   const isMedico = currentUser.rol === 'medico';
-  const tbody = document.getElementById(isMedico ? 'med-table-body' : 'my-table-body');
-  const cols = isMedico ? 9 : 8;
+  const isSupervisor = currentUser.rol === 'supervisor';
+
+  let tbody, cols;
+  if (isSupervisor) {
+    tbody = document.getElementById('sup-table-body');
+    cols = 9;
+  } else if (isMedico) {
+    tbody = document.getElementById('med-table-body');
+    cols = 9;
+  } else {
+    tbody = document.getElementById('my-table-body');
+    cols = 8;
+  }
 
   // ── Actualizar encabezados con botones de orden ──
   const thead = tbody.closest('table').querySelector('thead tr');
@@ -579,6 +647,18 @@ function renderTable(records, isFullList) {
         <td>${aprobadoBadge}</td>
         <td>${obsBadge}</td>
         <td>${revBtn}</td>
+      </tr>`;
+    } else if (isSupervisor) {
+      return `<tr>
+        <td><strong>${r.nombrePaciente}</strong></td>
+        <td style="color:var(--text-2)">${r.cedulaPaciente}</td>
+        <td>${formatDate(r.fechaElectro)}</td>
+        <td>${formatDateTime(r.fechaSubida)}</td>
+        <td>${r.subidoPor}</td>
+        <td>${verBtn}</td>
+        <td>${aprobadoBadge}</td>
+        <td>${obsBadge}</td>
+        <td>${detBtn}</td>
       </tr>`;
     } else {
       return `<tr>
@@ -924,6 +1004,9 @@ function renderUsersTable() {
     } else if (u.rol === 'admin') {
       rolLabel = '⚙️ Admin';
       rolClass = 'rol-badge rol-admin';
+    } else if (u.rol === 'supervisor') {
+      rolLabel = '📊 Supervisor';
+      rolClass = 'rol-badge rol-supervisor';
     } else {
       rolLabel = '🏥 Enfermero/a';
       rolClass = 'rol-badge rol-enfermero';
@@ -1134,4 +1217,914 @@ async function toggleUserStatus(index, newStatus) {
   } finally {
     hideLoading();
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUPERVISOR — Tab navigation
+// ═════════════════════════════════════════════════════════════==
+function showSupervisorTab(tab, btnEl) {
+  // Toggle tab buttons
+  document.querySelectorAll('#view-supervisor .tab-btn').forEach(b => b.classList.remove('active'));
+  btnEl.classList.add('active');
+
+  // Toggle panels
+  document.getElementById('panel-dashboard').classList.remove('active');
+  document.getElementById('panel-reportes').classList.remove('active');
+  document.getElementById('panel-encuestas-sup').classList.remove('active');
+
+  if (tab === 'dashboard') {
+    document.getElementById('panel-dashboard').classList.add('active');
+  } else if (tab === 'reportes') {
+    document.getElementById('panel-reportes').classList.add('active');
+    renderRecords(allRecords);
+    renderReportSummary(allRecords);
+  } else if (tab === 'encuestas') {
+    document.getElementById('panel-encuestas-sup').classList.add('active');
+    loadSurveys();
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// SUPERVISOR — Cargar datos
+// ═════════════════════════════════════════════════════════======
+async function loadSupervisorData() {
+  showLoading('Cargando dashboard...');
+  try {
+    const [recRes, survRes] = await Promise.all([
+      apiCall({ action: 'getRecords', rol: currentUser.rol, username: currentUser.username }),
+      apiCall({ action: 'getSurveys', rol: currentUser.rol, username: currentUser.username })
+    ]);
+
+    if (recRes.success) {
+      allRecords = recRes.records;
+      renderDashboard(allRecords);
+      populateEnfermeroFilter(allRecords);
+    }
+
+    if (survRes.success) {
+      renderSurveysTable(survRes.surveys);
+    }
+  } catch (e) {
+    toast('Error de conexión', 'error');
+    console.error(e);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUPERVISOR — Dashboard KPIs
+// ═══════════════════════════════════════════════════════════════
+function renderDashboard(records) {
+  // Determinar rango de fechas para filtrar
+  const desdeInput = document.getElementById('dash-fecha-desde')?.value;
+  const hastaInput = document.getElementById('dash-fecha-hasta')?.value;
+
+  let filteredRecords = records;
+
+  if (desdeInput && hastaInput) {
+    const desdeDate = new Date(desdeInput + 'T00:00:00');
+    const hastaDate = new Date(hastaInput + 'T23:59:59');
+    filteredRecords = records.filter(r => {
+      const rd = parseDateForSort(r.fechaElectro);
+      return rd >= desdeDate && rd <= hastaDate;
+    });
+  } else {
+    // Sin filtro: usar últimos 7 días
+    const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+    const startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - 6);
+    startDate.setHours(0, 0, 0, 0);
+    filteredRecords = records.filter(r => {
+      const rd = parseDateForSort(r.fechaElectro);
+      return rd >= startDate && rd <= endDate;
+    });
+  }
+
+  const total = filteredRecords.length;
+  const aprobados = filteredRecords.filter(r => r.aprobado === 'Aprobado').length;
+  const rechazados = filteredRecords.filter(r => r.aprobado === 'No Aprobado').length;
+  const pendientes = total - aprobados - rechazados;
+
+  const pctAprobados = total ? Math.round((aprobados / total) * 100) : 0;
+  const pctRechazados = total ? Math.round((rechazados / total) * 100) : 0;
+  const pctPendientes = total ? Math.round((pendientes / total) * 100) : 0;
+
+  const kpiGrid = document.getElementById('kpi-grid');
+  kpiGrid.innerHTML = `
+    <div class="kpi-card kpi-total">
+      <div class="kpi-icon">📋</div>
+      <div class="kpi-value">${total}</div>
+      <div class="kpi-label">Total ECG</div>
+    </div>
+    <div class="kpi-card kpi-aprobados">
+      <div class="kpi-icon">✅</div>
+      <div class="kpi-value">${aprobados} <span class="kpi-pct">${pctAprobados}%</span></div>
+      <div class="kpi-label">Aprobados</div>
+    </div>
+    <div class="kpi-card kpi-rechazados">
+      <div class="kpi-icon">❌</div>
+      <div class="kpi-value">${rechazados} <span class="kpi-pct">${pctRechazados}%</span></div>
+      <div class="kpi-label">No Aprobados</div>
+    </div>
+    <div class="kpi-card kpi-pendientes">
+      <div class="kpi-icon">⏳</div>
+      <div class="kpi-value">${pendientes} <span class="kpi-pct">${pctPendientes}%</span></div>
+      <div class="kpi-label">Pendientes</div>
+    </div>`;
+
+  renderCharts(filteredRecords);
+}
+
+function filterDashboard() {
+  // renderDashboard ya hace el filtrado internamente por fechaElectro
+  renderDashboard(allRecords);
+}
+
+function clearDashboardFilter() {
+  document.getElementById('dash-fecha-desde').value = '';
+  document.getElementById('dash-fecha-hasta').value = '';
+  renderDashboard(allRecords);
+}
+
+function renderCharts(records) {
+  // Destroy previous chart instances
+  if (chartBar) { chartBar.destroy(); chartBar = null; }
+  if (chartDonut) { chartDonut.destroy(); chartDonut = null; }
+  if (chartEnfermeros) { chartEnfermeros.destroy(); chartEnfermeros = null; }
+
+  // Determinar rango de fechas para el gráfico
+  const desdeInput = document.getElementById('dash-fecha-desde')?.value;
+  const hastaInput = document.getElementById('dash-fecha-hasta')?.value;
+  let startDate, endDate, daysRange, chartTitle;
+
+  if (desdeInput && hastaInput) {
+    startDate = new Date(desdeInput + 'T00:00:00');
+    endDate = new Date(hastaInput + 'T23:59:59');
+    daysRange = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+    const [y1, m1, d1] = desdeInput.split('-');
+    const [y2, m2, d2] = hastaInput.split('-');
+    chartTitle = `📈 ECG subidos (${d1}/${m1} - ${d2}/${m2})`;
+  } else {
+    endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+    startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - 6);
+    startDate.setHours(0, 0, 0, 0);
+    daysRange = 7;
+    chartTitle = '📈 ECG subidos por día (últimos 7 días)';
+  }
+
+  // Bar Chart: ECG subidos por día
+  const labels = [];
+  const counts = [];
+  const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+  for (let i = 0; i < daysRange; i++) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + i);
+    d.setHours(0, 0, 0, 0);
+    const nextD = new Date(d);
+    nextD.setDate(nextD.getDate() + 1);
+
+    labels.push(`${dayNames[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`);
+
+    counts.push(records.filter(r => {
+      const rd = parseDateForSort(r.fechaElectro);
+      return rd >= d && rd < nextD;
+    }).length);
+  }
+
+  const barCtx = document.getElementById('chart-bar');
+  if (barCtx) {
+    chartBar = new Chart(barCtx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'ECG subidos',
+          data: counts,
+          backgroundColor: 'rgba(123, 31, 162, 0.7)',
+          borderColor: '#7b1fa2',
+          borderWidth: 1,
+          borderRadius: 6,
+          maxBarThickness: 40
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { stepSize: 1 } },
+          x: { ticks: {} }
+        }
+      }
+    });
+  }
+
+  // Actualizar título
+  const chartBarTitle = document.getElementById('chart-bar-title');
+  if (chartBarTitle) chartBarTitle.textContent = chartTitle;
+
+  // Donut Chart: Distribución de estados
+  const aprobados = records.filter(r => r.aprobado === 'Aprobado').length;
+  const rechazados = records.filter(r => r.aprobado === 'No Aprobado').length;
+  const pendientes = records.length - aprobados - rechazados;
+
+  const donutCtx = document.getElementById('chart-donut');
+  if (donutCtx) {
+    chartDonut = new Chart(donutCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Aprobados', 'No Aprobados', 'Pendientes'],
+        datasets: [{
+          data: [aprobados, rechazados, pendientes],
+          backgroundColor: ['#66bb6a', '#ef5350', '#ffa726'],
+          borderColor: '#fff',
+          borderWidth: 3
+        }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '62%' }
+    });
+  }
+
+  // Horizontal Bar: ECG por enfermero
+  const enfermeroMap = {};
+  records.forEach(r => {
+    const enf = r.subidoPor || 'Desconocido';
+    enfermeroMap[enf] = (enfermeroMap[enf] || 0) + 1;
+  });
+  const sortedEnf = Object.entries(enfermeroMap).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const enfLabels = sortedEnf.map(e => e[0]);
+  const enfCounts = sortedEnf.map(e => e[1]);
+
+  const enfCtx = document.getElementById('chart-enfermeros');
+  if (enfCtx) {
+    chartEnfermeros = new Chart(enfCtx, {
+      type: 'bar',
+      indexAxis: 'y',
+      data: {
+        labels: enfLabels,
+        datasets: [{ label: 'ECG', data: enfCounts, backgroundColor: '#0097a7cc' }]
+      },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// SUPERVISOR — Poblar dropdown de enfermeros
+// ═══════════════════════════════════════════════════════
+function populateEnfermeroFilter(records) {
+  const select = document.getElementById('filtro-enfermero-sup');
+  if (!select) return;
+
+  const enfermeros = [...new Set(records.map(r => r.subidoPor).filter(Boolean))].sort();
+
+  // Mantener valor actual si existe
+  const currentVal = select.value;
+  select.innerHTML = '<option value="todos">Todos los enfermeros</option>';
+  enfermeros.forEach(enf => {
+    select.innerHTML += `<option value="${enf}" ${currentVal === enf ? 'selected' : ''}>${enf}</option>`;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUPERVISOR — Resumen del reporte
+// ═══════════════════════════════════════════════════════════════
+function renderReportSummary(records) {
+  const container = document.getElementById('sup-report-summary');
+  if (!container) return;
+
+  if (!records.length) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const total = records.length;
+  const aprobados = records.filter(r => r.aprobado === 'Aprobado').length;
+  const rechazados = records.filter(r => r.aprobado === 'No Aprobado').length;
+  const pendientes = total - aprobados - rechazados;
+
+  container.innerHTML = `
+    <div class="report-summary">
+      <span class="report-summary-item">📊 <strong>${total}</strong> registros encontrados</span>
+      <span class="report-summary-divider"></span>
+      <span class="report-summary-item">✅ ${aprobados} aprobados</span>
+      <span class="report-summary-divider"></span>
+      <span class="report-summary-item">❌ ${rechazados} rechazados</span>
+      <span class="report-summary-divider"></span>
+      <span class="report-summary-item">⏳ ${pendientes} pendientes</span>
+</div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+// SUPERVISOR — Cargar datos (continuación)
+// ═════════════════════════════════════════════════════==
+function populateEnfermeroFilter(records) {
+  const select = document.getElementById('filtro-enfermero-sup');
+  if (!select) return;
+
+  const enfermeros = [...new Set(records.map(r => r.subidoPor).filter(Boolean))].sort();
+  select.innerHTML = '<option value="todos">Todos los enfermeros</option>' +
+    enfermeros.map(e => `<option value="${e}">${e}</option>`).join('');
+}
+
+let currentSurvey = null;
+let surveyQuestions = [];
+
+// ═══════════════════════════════════════════════════════════════
+// SUPERVISOR — Encuestas
+// ═══════════════════════════════════════════════════════
+function loadSurveys() {
+  apiCall({ action: 'getSurveys', rol: currentUser.rol, username: currentUser.username })
+    .then(res => {
+      if (res.success) renderSurveysTable(res.surveys);
+      else toast('Error al cargar encuestas', 'error');
+    });
+}
+
+function renderSurveysTable(surveys) {
+  const tbody = document.getElementById('surveys-table-body');
+  if (!tbody) return;
+
+  if (!surveys.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="loading-row">No hay encuestas creadas</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = surveys.map(s => {
+    const activa = s.activa ? 'SI' : 'NO';
+    return `<tr>
+      <td><strong>${s.titulo}</strong></td>
+      <td>${s.creadaPor}</td>
+      <td>${s.fechaCreacion}</td>
+      <td><span class="obs-badge ${s.activa ? 'obs-yes' : 'obs-no'}">${s.activa ? 'Activa' : 'Inactiva'}</span></td>
+      <td>${s.totalRespuestas}</td>
+      <td>
+        <button type="button" class="btn btn-sm btn-teal-outline" data-action="edit" data-id="${s.id}">✏️ Editar</button>
+        <button type="button" class="btn btn-sm btn-secondary" data-action="responses" data-id="${s.id}">📋 Respuestas</button>
+        <button type="button" class="btn btn-sm btn-danger-outline" data-action="delete" data-id="${s.id}">🗑️ Eliminar</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Add event listeners to buttons
+  tbody.querySelectorAll('button[data-action]').forEach(btn => {
+    btn.onclick = function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const action = e.target.dataset.action;
+      const id = e.target.dataset.id;
+      if (action === 'edit') editSurvey(id);
+      else if (action === 'responses') viewSurveyResponses(id);
+      else if (action === 'delete') showConfirmModal('¿Estás seguro de eliminar esta encuesta? Se perderán todas las respuestas.', () => doDeleteDirect(id));
+    };
+  });
+}
+
+function showConfirmModal(message, onConfirm) {
+  document.getElementById('confirm-message').textContent = message;
+  document.getElementById('confirm-ok-btn').onclick = function () {
+    closeConfirmModal();
+    onConfirm();
+  };
+  document.getElementById('confirm-modal').style.display = 'flex';
+  document.getElementById('confirm-modal').classList.add('open');
+}
+
+function closeConfirmModal() {
+  document.getElementById('confirm-modal').style.display = 'none';
+  document.getElementById('confirm-modal').classList.remove('open');
+}
+
+function doDeleteDirect(id) {
+  showLoading('Eliminando...');
+
+  fetch(API_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'deleteSurvey', id: id })
+  })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        toast('✅ Encuesta eliminada', 'success');
+        loadSurveys();
+      } else {
+        toast(res.message || 'Error al eliminar', 'error');
+      }
+    })
+    .catch(err => {
+      toast('Error de conexión', 'error');
+    })
+    .finally(() => {
+      hideLoading();
+    });
+}
+
+function confirmDeleteSurvey(id) {
+  if (!confirm('¿Estás seguro de eliminar esta encuesta? Se perderán todas las respuestas.')) return;
+
+  showLoading('Eliminando...');
+  try {
+    const res = apiCall({ action: 'deleteSurvey', id });
+    res.then(r => {
+      if (r.success) {
+        toast('✅ Encuesta eliminada', 'success');
+        loadSurveys();
+      } else {
+        toast(r.message || 'Error al eliminar', 'error');
+      }
+    });
+  } catch (e) {
+    console.error('Delete error:', e);
+    toast('Error de conexión', 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function showCreateSurvey() {
+  currentSurvey = null;
+  surveyQuestions = [];
+  document.getElementById('survey-titulo').value = '';
+  document.getElementById('survey-desc').value = '';
+  document.getElementById('survey-questions-builder').innerHTML = '';
+  addQuestion();
+  document.getElementById('sup-surveys-list').style.display = 'none';
+  document.getElementById('sup-survey-form').style.display = 'block';
+}
+
+function addQuestion() {
+  const idx = surveyQuestions.length;
+  surveyQuestions.push({ tipo: 'texto', pregunta: '', opciones: [] });
+  renderQuestionsBuilder();
+}
+
+function removeQuestion(idx) {
+  surveyQuestions.splice(idx, 1);
+  renderQuestionsBuilder();
+}
+
+function renderQuestionsBuilder() {
+  const container = document.getElementById('survey-questions-builder');
+  container.innerHTML = surveyQuestions.map((q, i) => `
+    <div class="question-card">
+      <button class="question-delete" onclick="removeQuestion(${i})">✕</button>
+      <div class="question-card-header">
+        <span class="question-number">${i + 1}</span>
+        <input class="form-input" type="text" placeholder="Escribe la pregunta"
+          value="${q.pregunta}" onchange="updateQuestion(${i}, 'pregunta', this.value)">
+      </div>
+      <div class="question-card-body">
+        <select class="form-input" style="width:160px" onchange="updateQuestionType(${i}, this.value)">
+          <option value="texto" ${q.tipo === 'texto' ? 'selected' : ''}>Texto</option>
+          <option value="radio" ${q.tipo === 'radio' ? 'selected' : ''}>Opción múltiple (una)</option>
+          <option value="checkbox" ${q.tipo === 'checkbox' ? 'selected' : ''}>Opción múltiple (varias)</option>
+          <option value="numero" ${q.tipo === 'numero' ? 'selected' : ''}>Número</option>
+          <option value="textarea" ${q.tipo === 'textarea' ? 'selected' : ''}>Texto largo</option>
+        </select>
+        ${(q.tipo === 'radio' || q.tipo === 'checkbox') ? `
+          <div class="options-builder" style="flex:1;display:flex;flex-direction:column;gap:6px;margin-top:8px;">
+            <div style="font-size:11px;color:var(--text-2);text-transform:uppercase;font-weight:600;">Opciones</div>
+            ${(q.opciones || []).map((opt, oi) => `
+              <div class="option-item">
+                <input class="form-input" type="text" value="${opt}"
+                  onchange="updateOptionValue(${i}, ${oi}, this.value)" placeholder="Opción">
+                <button class="btn btn-sm btn-danger-outline" onclick="removeOption(${i}, ${oi})">✕</button>
+              </div>
+            `).join('')}
+            <button class="btn btn-sm btn-teal-outline" onclick="addOption(${i})">➕ Agregar opción</button>
+          </div>
+        ` : ''}
+      </div>
+      <div class="question-validation" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
+          <input type="checkbox" ${q.obligatoria ? 'checked' : ''} onchange="updateQuestion(${i}, 'obligatoria', this.checked)">
+          Obligatoria
+        </label>
+        ${q.tipo === 'numero' ? `
+          <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+            <input type="number" class="form-input" style="width:80px" placeholder="Mín" value="${q.valorMin === undefined ? '' : q.valorMin}" 
+              onchange="updateQuestion(${i}, 'valorMin', this.value !== '' ? parseFloat(this.value) : undefined)">
+            <span style="color:var(--text-2)">-</span>
+            <input type="number" class="form-input" style="width:80px" placeholder="Máx" value="${q.valorMax === undefined ? '' : q.valorMax}" 
+              onchange="updateQuestion(${i}, 'valorMax', this.value !== '' ? parseFloat(this.value) : undefined)">
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function updateQuestionType(idx, value) {
+  surveyQuestions[idx].tipo = value;
+  if (value === 'radio' || value === 'checkbox') {
+    surveyQuestions[idx].opciones = surveyQuestions[idx].opciones || [''];
+  } else {
+    surveyQuestions[idx].opciones = null;
+  }
+  renderQuestionsBuilder();
+}
+
+function addOption(qIdx) {
+  surveyQuestions[qIdx].opciones.push('');
+  renderQuestionsBuilder();
+}
+
+function removeOption(qIdx, oIdx) {
+  surveyQuestions[qIdx].opciones.splice(oIdx, 1);
+  renderQuestionsBuilder();
+}
+
+function updateOptionValue(qIdx, oIdx, value) {
+  surveyQuestions[qIdx].opciones[oIdx] = value;
+}
+
+function updateQuestion(idx, field, value) {
+  surveyQuestions[idx][field] = value;
+}
+
+async function saveSurvey() {
+  const titulo = document.getElementById('survey-titulo').value.trim();
+  const descripcion = document.getElementById('survey-desc').value.trim();
+
+  if (!titulo) {
+    toast('El título es obligatorio', 'error');
+    return;
+  }
+
+  const validQuestions = surveyQuestions.filter(q => q.pregunta.trim());
+  if (!validQuestions.length) {
+    toast('Agrega al menos una pregunta', 'error');
+    return;
+  }
+
+  showLoading('Guardando...');
+  try {
+    let res;
+    if (currentSurvey) {
+      res = await apiCall({
+        action: 'updateSurvey',
+        id: currentSurvey.id,
+        titulo,
+        descripcion,
+        preguntas: validQuestions
+      });
+    } else {
+      res = await apiCall({
+        action: 'createSurvey',
+        titulo,
+        descripcion,
+        preguntas: validQuestions,
+        creadaPor: currentUser.username
+      });
+    }
+
+    if (res.success) {
+      toast('✅ Encuesta guardada correctamente', 'success');
+      backToSurveyAdmin();
+      loadSurveys();
+    } else {
+      toast(res.message || 'Error al guardar', 'error');
+    }
+  } catch (e) {
+    toast('Error de conexión', 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function editSurvey(id) {
+  apiCall({ action: 'getSurveys', rol: currentUser.rol, username: currentUser.username })
+    .then(res => {
+      if (!res.success) return;
+      const s = res.surveys.find(x => x.id === id);
+      if (!s) return;
+
+      currentSurvey = s;
+      surveyQuestions = s.preguntas || [];
+      document.getElementById('survey-titulo').value = s.titulo;
+      document.getElementById('survey-desc').value = s.descripcion || '';
+      renderQuestionsBuilder();
+      document.getElementById('sup-surveys-list').style.display = 'none';
+      document.getElementById('sup-survey-form').style.display = 'block';
+    });
+}
+
+async function confirmDeleteSurvey(id) {
+  if (!confirm('¿Estás seguro de eliminar esta encuesta? Se perderán todas las respuestas.')) return;
+
+  showLoading('Eliminando...');
+  try {
+    console.log('Sending delete request for ID:', id);
+    const res = await apiCall({ action: 'deleteSurvey', id: id });
+    console.log('Delete response:', res);
+    alert('Debug: ' + JSON.stringify(res.debug || []));
+    if (res.success) {
+      toast('✅ Encuesta eliminada', 'success');
+      loadSurveys();
+    } else {
+      toast(res.message || 'Error al eliminar', 'error');
+    }
+  } catch (e) {
+    console.error('Delete error:', e);
+    alert('Error: ' + e.message);
+    toast('Error de conexión', 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function viewSurveyResponses(id) {
+  apiCall({ action: 'getSurveys', rol: currentUser.rol, username: currentUser.username })
+    .then(res => {
+      if (!res.success) return;
+      const s = res.surveys.find(x => x.id === id);
+      if (!s) return;
+
+      document.getElementById('responses-survey-title').textContent = s.titulo;
+      document.getElementById('responses-survey-desc').textContent = s.descripcion || '';
+      document.getElementById('sup-surveys-list').style.display = 'none';
+      document.getElementById('sup-survey-form').style.display = 'none';
+      document.getElementById('sup-survey-responses').style.display = 'block';
+
+      loadSurveyResponses(id, s);
+    });
+}
+
+async function loadSurveyResponses(id, survey) {
+  try {
+    const res = await apiCall({ action: 'getSurveyResponses', encuestaId: id });
+    if (res.success) {
+      renderResponsesTable(res.responses, survey);
+    }
+  } catch (e) {
+    toast('Error de conexión', 'error');
+  }
+}
+
+function renderResponsesTable(responses, survey) {
+  const tbody = document.getElementById('responses-table-body');
+  const summary = document.getElementById('responses-summary');
+
+  if (!responses.length) {
+    tbody.innerHTML = '<tr><td colspan="3" class="loading-row">No hay respuestas aún</td></tr>';
+    summary.innerHTML = '';
+    return;
+  }
+
+  summary.innerHTML = `<div class="report-summary">
+    <span class="report-summary-item">📊 <strong>${responses.length}</strong> respuestas</span>
+  </div>`;
+
+  tbody.innerHTML = responses.map(r => `
+    <tr>
+      <td>${r.respondidoPor}</td>
+      <td>${r.fechaRespuesta}</td>
+      <td><button class="btn btn-sm btn-secondary" onclick="viewResponseDetail('${r.id}')">🔍 Ver</button></td>
+    </tr>
+  `).join('');
+}
+
+function backToSurveyAdmin() {
+  currentSurvey = null;
+  surveyQuestions = [];
+  document.getElementById('sup-survey-form').style.display = 'none';
+  document.getElementById('sup-survey-responses').style.display = 'none';
+  document.getElementById('sup-surveys-list').style.display = 'block';
+  loadSurveys();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ENFERMERO — Encuestas
+// ═══════════════════════════════════════════════════════
+let currentEnfSurvey = null;
+let enfSurveyResponses = {};
+
+function loadEnfSurveys() {
+  apiCall({ action: 'getSurveys', rol: currentUser.rol, username: currentUser.username })
+    .then(res => {
+      if (res.success) renderEnfSurveysList(res.surveys);
+      else toast('Error al cargar encuestas', 'error');
+    });
+}
+
+function renderEnfSurveysList(surveys) {
+  const container = document.getElementById('enf-surveys-cards');
+  if (!container) return;
+
+  const activeSurveys = surveys.filter(s => s.activa);
+
+  if (!activeSurveys.length) {
+    container.innerHTML = '<div class="surveys-empty"><div class="empty-icon">📝</div><div class="empty-title">No hay encuestas disponibles</div><div class="empty-desc">Actualmente no hay encuestas activas.</div></div>';
+    return;
+  }
+
+  container.innerHTML = activeSurveys.map(s => {
+    const badgeClass = s.respuestaHoy ? 'survey-completed' : 'survey-pending';
+    const badgeText = s.respuestaHoy ? 'Respondida hoy' : 'Pendiente';
+    return `
+    <div class="survey-card">
+      <div class="survey-card-header">
+        <h4>${s.titulo}</h4>
+        <span class="survey-badge ${badgeClass}">${badgeText}</span>
+      </div>
+      <p class="survey-desc">${s.descripcion || ''}</p>
+      <div class="survey-meta">Creada: ${s.fechaCreacion} · ${s.totalRespuestas || 0} respuestas</div>
+      <button class="btn btn-primary" onclick="openEnfSurveyForm('${s.id}')">${s.respuestaHoy ? '📝 Volver a responder' : '📝 Responder Encuesta'}</button>
+    </div>
+  `}).join('');
+}
+
+function openEnfSurveyForm(id) {
+  apiCall({ action: 'getSurveys', rol: currentUser.rol, username: currentUser.username })
+    .then(res => {
+      if (!res.success) return;
+      const s = res.surveys.find(x => x.id === id);
+      if (!s) return;
+
+      currentEnfSurvey = s;
+      enfSurveyResponses = {};
+
+      document.getElementById('enf-survey-title').textContent = s.titulo;
+      document.getElementById('enf-survey-desc').textContent = s.descripcion || '';
+
+      renderEnfSurveyQuestions(s.preguntas);
+
+      document.getElementById('enf-surveys-list').style.display = 'none';
+      document.getElementById('enf-survey-form').style.display = 'block';
+    });
+}
+
+function renderEnfSurveyQuestions(preguntas) {
+  const container = document.getElementById('enf-survey-questions');
+  if (!preguntas || !preguntas.length) {
+    container.innerHTML = '<p>No hay preguntas en esta encuesta.</p>';
+    return;
+  }
+
+  container.innerHTML = preguntas.map((p, i) => `
+    <div class="survey-question">
+      <label class="survey-question-label">
+        ${i + 1}. ${p.pregunta}
+        ${(p.obligatoria === true || p.obligatoria === 'true') ? '<span class="required-mark">*</span>' : ''}
+      </label>
+      ${renderEnfQuestionInput(p, i)}
+    </div>
+  `).join('');
+}
+
+function renderEnfQuestionInput(pregunta, idx) {
+  const name = 'pregunta_' + idx;
+  const respuestas = currentEnfSurvey.preguntas;
+
+  // Texto con opciones = radio buttons
+  if (pregunta.tipo === 'texto' && pregunta.opciones && pregunta.opciones.length > 0) {
+    const opts = pregunta.opciones || [];
+    return `<div class="survey-radio-group">
+      ${opts.map((o, oi) => `
+        <label>
+          <input type="radio" name="${name}" value="${o}" onchange="setEnfResponse(${idx}, this.value)">
+          ${o}
+        </label>
+      `).join('')}
+    </div>`;
+  }
+
+  if (pregunta.tipo === 'texto') {
+    return `<input type="text" class="form-input" name="${name}" onchange="setEnfResponse(${idx}, this.value)">`;
+  }
+
+  if (pregunta.tipo === 'numero') {
+    return `<input type="number" class="form-input" name="${name}" onchange="setEnfResponse(${idx}, this.value)">`;
+  }
+
+  if (pregunta.tipo === 'textarea') {
+    return `<textarea class="form-input" name="${name}" rows="3" onchange="setEnfResponse(${idx}, this.value)"></textarea>`;
+  }
+
+  if (pregunta.tipo === 'radio') {
+    const opts = pregunta.opciones || [];
+    return `<div class="survey-radio-group">
+      ${opts.map((o, oi) => `
+        <label>
+          <input type="radio" name="${name}" value="${o}" onchange="setEnfResponse(${idx}, this.value)">
+          ${o}
+        </label>
+      `).join('')}
+    </div>`;
+  }
+
+  if (pregunta.tipo === 'checkbox') {
+    const opts = pregunta.opciones || [];
+    return `<div class="survey-checkbox-group">
+      ${opts.map((o, oi) => `
+        <label>
+          <input type="checkbox" name="${name}_${oi}" value="${o}" onchange="setEnfCheckboxResponse(${idx}, '${name}')">
+          ${o}
+        </label>
+      `).join('')}
+    </div>`;
+  }
+
+  return `<input type="text" class="form-input" name="${name}" onchange="setEnfResponse(${idx}, this.value)">`;
+}
+
+function setEnfResponse(idx, value) {
+  enfSurveyResponses[idx] = value;
+}
+
+function setEnfCheckboxResponse(idx, name) {
+  const checkboxes = document.querySelectorAll(`input[name^="${name}"]:checked`);
+  const values = Array.from(checkboxes).map(cb => cb.value);
+  enfSurveyResponses[idx] = values;
+}
+
+async function submitEnfSurveyResponse() {
+  const preguntas = currentEnfSurvey.preguntas;
+
+  const respostas = [];
+  let incomplete = false;
+
+  for (let i = 0; i < preguntas.length; i++) {
+    const p = preguntas[i];
+    const esObligatoria = p.obligatoria === true || p.obligatoria === 'true';
+    const valor = enfSurveyResponses[i];
+
+    if (esObligatoria && p.tipo === 'checkbox') {
+      const checked = document.querySelectorAll(`input[name^="pregunta_${i}_"]:checked`);
+      if (checked.length === 0) {
+        incomplete = true;
+        continue;
+      }
+      respostas.push({ pregunta: p.pregunta, respuesta: Array.from(checked).map(cb => cb.value).join(', ') });
+      continue;
+    }
+
+    if (esObligatoria && (!valor || !valor.trim())) {
+      incomplete = true;
+      continue;
+    }
+
+if (p.tipo === 'numero' && (p.valorMin !== undefined || p.valorMax !== undefined)) {
+      const num = valor === '' || !valor ? 0 : parseFloat(valor);
+      if (p.valorMin !== undefined && num < Number(p.valorMin)) {
+        toast(`En "${p.pregunta}" debe ser mayor o igual a ${p.valorMin}`, 'error');
+        incomplete = true;
+        continue;
+      }
+      if (p.valorMax !== undefined && num > Number(p.valorMax)) {
+        toast(`En "${p.pregunta}" debe ser menor o igual a ${p.valorMax}`, 'error');
+        incomplete = true;
+        continue;
+      }
+    }
+
+    if (p.tipo === 'checkbox') {
+      const checked = document.querySelectorAll(`input[name^="pregunta_${i}_"]:checked`);
+      respostas.push({ pregunta: p.pregunta, respuesta: Array.from(checked).map(cb => cb.value).join(', ') });
+    } else if (p.tipo === 'numero') {
+      respostas.push({ pregunta: p.pregunta, respuesta: valor === '' || !valor ? '0' : valor });
+    } else {
+      respostas.push({ pregunta: p.pregunta, respuesta: valor || '' });
+    }
+  }
+
+  if (incomplete) {
+    toast('Responde todas las preguntas obligatorias', 'error');
+    return;
+  }
+
+  showLoading('Enviando...');
+  try {
+    const res = await apiCall({
+      action: 'submitSurveyResponse',
+      encuestaId: currentEnfSurvey.id,
+      respondidoPor: currentUser.username,
+      respuestas: respostas
+    });
+
+    if (res.success) {
+      toast('✅ Respuesta enviada correctamente', 'success');
+      backToEnfSurveysList();
+    } else {
+      toast(res.message || 'Error al enviar', 'error');
+    }
+  } catch (e) {
+    toast('Error de conexión', 'error');
+  } finally {
+    hideLoading();
+}
+}
+
+function backToEnfSurveysList() {
+  currentEnfSurvey = null;
+  enfSurveyResponses = {};
+  document.getElementById('enf-survey-form').style.display = 'none';
+  document.getElementById('enf-surveys-list').style.display = 'block';
+  loadEnfSurveys();
 }
