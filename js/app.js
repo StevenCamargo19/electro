@@ -1710,8 +1710,8 @@ function renderQuestionsBuilder() {
       <button class="question-delete" onclick="removeQuestion(${i})">✕</button>
       <div class="question-card-header">
         <span class="question-number">${i + 1}</span>
-        <input class="form-input" type="text" placeholder="Escribe la pregunta"
-          value="${q.pregunta}" onchange="updateQuestion(${i}, 'pregunta', this.value)">
+        <textarea class="form-input" placeholder="Escribe la pregunta"
+          onchange="updateQuestion(${i}, 'pregunta', this.value)">${q.pregunta || ''}</textarea>
       </div>
       <div class="question-card-body">
         <select class="form-input" style="width:200px" onchange="updateQuestionType(${i}, this.value)">
@@ -1720,8 +1720,9 @@ function renderQuestionsBuilder() {
           <option value="checkbox" ${q.tipo === 'checkbox' ? 'selected' : ''}>Opción múltiple (varias)</option>
           <option value="numero" ${q.tipo === 'numero' ? 'selected' : ''}>Número</option>
           <option value="textarea" ${q.tipo === 'textarea' ? 'selected' : ''}>Texto largo</option>
+          <option value="lista" ${q.tipo === 'lista' ? 'selected' : ''}>Lista desplegable</option>
         </select>
-        ${(q.tipo === 'radio' || q.tipo === 'checkbox') ? `
+        ${(q.tipo === 'radio' || q.tipo === 'checkbox' || q.tipo === 'lista') ? `
           <div class="options-builder">
             <div style="font-size:11px;color:var(--text-2);text-transform:uppercase;font-weight:600;margin-bottom:6px;">Opciones</div>
             ${(q.opciones || []).map((opt, oi) => `
@@ -1742,10 +1743,10 @@ function renderQuestionsBuilder() {
         </label>
         ${q.tipo === 'numero' ? `
           <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
-            <input type="number" class="form-input" style="width:80px" placeholder="Mín" value="${q.valorMin === undefined ? '' : q.valorMin}" 
+            <input type="number" class="form-input" style="width:80px" placeholder="Mín" value="${q.valorMin === undefined ? '' : q.valorMin}"
               onchange="updateQuestion(${i}, 'valorMin', this.value !== '' ? parseFloat(this.value) : undefined)">
             <span style="color:var(--text-2)">-</span>
-            <input type="number" class="form-input" style="width:80px" placeholder="Máx" value="${q.valorMax === undefined ? '' : q.valorMax}" 
+            <input type="number" class="form-input" style="width:80px" placeholder="Máx" value="${q.valorMax === undefined ? '' : q.valorMax}"
               onchange="updateQuestion(${i}, 'valorMax', this.value !== '' ? parseFloat(this.value) : undefined)">
           </div>
         ` : ''}
@@ -1756,7 +1757,7 @@ function renderQuestionsBuilder() {
 
 function updateQuestionType(idx, value) {
   surveyQuestions[idx].tipo = value;
-  if (value === 'radio' || value === 'checkbox') {
+  if (value === 'radio' || value === 'checkbox' || value === 'lista') {
     surveyQuestions[idx].opciones = surveyQuestions[idx].opciones || [''];
   } else {
     surveyQuestions[idx].opciones = null;
@@ -1765,6 +1766,9 @@ function updateQuestionType(idx, value) {
 }
 
 function addOption(qIdx) {
+  if (!surveyQuestions[qIdx].opciones) {
+    surveyQuestions[qIdx].opciones = [''];
+  }
   surveyQuestions[qIdx].opciones.push('');
   renderQuestionsBuilder();
 }
@@ -1903,12 +1907,19 @@ async function loadSurveyResponses(id, survey) {
   dateFilterTo = null;
   document.getElementById('filter-date-from').value = '';
   document.getElementById('filter-date-to').value = '';
+  document.getElementById('filter-nurse-name').value = '';
   document.getElementById('responses-table-body').innerHTML = '<tr><td colspan="3" class="loading-row">Cargando respuestas...</td></tr>';
 
   try {
     const res = await apiCall({ action: 'getSurveyResponses', encuestaId: id });
     if (res.success && currentSurveyRespId === id) {
       currentSurveyRespData = res.responses || [];
+      // Ordenar por defecto de más reciente a más antiguo
+      currentSurveyRespData.sort((a, b) => {
+        const dateA = parseDate(a.fechaRespuesta) || new Date(0);
+        const dateB = parseDate(b.fechaRespuesta) || new Date(0);
+        return dateB - dateA;
+      });
       filteredResponses = [...currentSurveyRespData];
       renderResponsesTable(filteredResponses, survey);
       switchTab('responses-list');
@@ -1940,7 +1951,8 @@ function switchTab(tabName) {
   }
 }
 
-function applyDateFilter() {
+function applyFilters() {
+  const nurseName = document.getElementById('filter-nurse-name').value.toLowerCase();
   const fromStr = document.getElementById('filter-date-from').value;
   const toStr = document.getElementById('filter-date-to').value;
 
@@ -1948,6 +1960,12 @@ function applyDateFilter() {
   dateFilterTo = toStr ? new Date(toStr + 'T23:59:59') : null;
 
   filteredResponses = currentSurveyRespData.filter(r => {
+    // Filtrar por nombre de enfermero
+    if (nurseName && r.respondidoPor.toLowerCase().indexOf(nurseName) === -1) {
+      return false;
+    }
+
+    // Filtrar por fecha
     const respDate = parseDate(r.fechaRespuesta);
     if (!respDate) return true;
 
@@ -1960,7 +1978,8 @@ function applyDateFilter() {
   renderResponsesTable(filteredResponses, currentSurveyForReport);
 }
 
-function clearDateFilter() {
+function clearAllFilters() {
+  document.getElementById('filter-nurse-name').value = '';
   document.getElementById('filter-date-from').value = '';
   document.getElementById('filter-date-to').value = '';
   dateFilterFrom = null;
@@ -2039,8 +2058,8 @@ function renderSurveyReport(responses, survey) {
       })
       .filter(r => r && r.respuesta);
 
-    html += '<div class="report-question" style="margin-bottom:20px;padding:16px;background:var(--bg-2);border-radius:8px">';
-    html += `<div style="font-weight:600;margin-bottom:12px">${idx + 1}. ${pregunta.pregunta}</div>`;
+    html += '<div class="report-question" style="margin-bottom:20px;padding:16px;background:var(--bg-2);border-radius:8px;overflow-wrap:break-word">';
+    html += `<div style="font-weight:600;margin-bottom:12px;word-wrap:break-word">${idx + 1}. ${pregunta.pregunta}</div>`;
 
     if (!respuestasPregunta.length) {
       html += '<div style="color:var(--text-2);font-size:13px">Sin respuestas</div>';
@@ -2048,6 +2067,7 @@ function renderSurveyReport(responses, survey) {
       switch (pregunta.tipo) {
         case 'radio':
         case 'checkbox':
+        case 'lista':
           const conteo = {};
           respuestasPregunta.forEach(r => {
             const vals = Array.isArray(r.respuesta) ? r.respuesta : [r.respuesta];
@@ -2102,32 +2122,30 @@ function viewResponseDetail(id) {
     toast('Respuesta no encontrada', 'error');
     return;
   }
-  
+
   let html = `<div style="max-width:500px;padding:20px">
     <h3 style="margin-bottom:16px">📋 Respuesta de ${response.respondidoPor}</h3>
     <p style="color:var(--text-2);margin-bottom:16px">📅 ${response.fechaRespuesta}</p>`;
-  
+
   if (response.respuestas && Array.isArray(response.respuestas)) {
     response.respuestas.forEach((resp, i) => {
-      html += `<div style="margin-bottom:12px;padding:12px;background:var(--bg-2);border-radius:8px">
-        <div style="font-weight:600;margin-bottom:4px">${i + 1}. ${resp.pregunta}</div>
-        <div style="color:var(--text-2)">${resp.respuesta || '(sin respuesta)'}</div>
+      html += `<div style="margin-bottom:12px;padding:12px;background:var(--bg-2);border-radius:8px;overflow-wrap:break-word">
+        <div style="font-weight:600;margin-bottom:4px;word-wrap:break-word">${i + 1}. ${resp.pregunta}</div>
+        <div style="color:var(--text-2);word-wrap:break-word">${resp.respuesta || '(sin respuesta)'}</div>
       </div>`;
     });
   } else if (response.respuestas) {
     const respuestas = JSON.parse(response.respuestas);
     if (Array.isArray(respuestas)) {
       respuestas.forEach((resp, i) => {
-        html += `<div style="margin-bottom:12px;padding:12px;background:var(--bg-2);border-radius:8px">
-          <div style="font-weight:600;margin-bottom:4px">${i + 1}. ${resp.pregunta}</div>
-          <div style="color:var(--text-2)">${resp.respuesta || '(sin respuesta)'}</div>
+        html += `<div style="margin-bottom:12px;padding:12px;background:var(--bg-2);border-radius:8px;overflow-wrap:break-word">
+          <div style="font-weight:600;margin-bottom:4px;word-wrap:break-word">${i + 1}. ${resp.pregunta}</div>
+          <div style="color:var(--text-2);word-wrap:break-word">${resp.respuesta || '(sin respuesta)'}</div>
         </div>`;
       });
     }
   }
-  
-  //html += `<button class="btn btn-secondary" onclick="closeModal()" style="margin-top:16px">Cerrar</button></div>`;
-  
+
   showModal(html);
 }
 
@@ -2257,8 +2275,7 @@ function renderEnfSurveyQuestions(preguntas) {
   container.innerHTML = preguntas.map((p, i) => `
     <div class="survey-question">
       <label class="survey-question-label">
-        ${i + 1}. ${p.pregunta}
-        ${(p.obligatoria === true || p.obligatoria === 'true') ? '<span class="required-mark">*</span>' : ''}
+        <span>${i + 1}. ${p.pregunta}${(p.obligatoria === true || p.obligatoria === 'true') ? ' <span class="required-mark">*</span>' : ''}</span>
       </label>
       ${renderEnfQuestionInput(p, i)}
     </div>
@@ -2316,6 +2333,14 @@ function renderEnfQuestionInput(pregunta, idx) {
         </label>
       `).join('')}
     </div>`;
+  }
+
+  if (pregunta.tipo === 'lista') {
+    const opts = pregunta.opciones || [];
+    return `<select class="form-input" name="${name}" onchange="setEnfResponse(${idx}, this.value)">
+      <option value="">Seleccione...</option>
+      ${opts.map(o => `<option value="${o}">${o}</option>`).join('')}
+    </select>`;
   }
 
   return `<input type="text" class="form-input" name="${name}" onchange="setEnfResponse(${idx}, this.value)">`;

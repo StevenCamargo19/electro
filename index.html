@@ -533,17 +533,19 @@
             <h3 class="section-title" id="responses-survey-title"></h3>
             <p class="section-desc" id="responses-survey-desc"></p>
 
-            <!-- Filtro de fechas -->
-            <div class="date-filter" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <!-- Filtros -->
+            <div style="display:flex;gap:12px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
+              <input type="text" id="filter-nurse-name" class="form-input" style="width:200px" placeholder="🔍 Buscar por enfermero..."
+                oninput="applyFilters()">
               <div class="date-range-group">
                 <label style="font-size:13px;color:var(--text-2)">Desde:</label>
-                <input type="date" id="filter-date-from" class="form-input" style="width:150px" onchange="applyDateFilter()">
+                <input type="date" id="filter-date-from" class="form-input" style="width:150px" onchange="applyFilters()">
               </div>
               <div class="date-range-group">
                 <label style="font-size:13px;color:var(--text-2)">Hasta:</label>
-                <input type="date" id="filter-date-to" class="form-input" style="width:150px" onchange="applyDateFilter()">
+                <input type="date" id="filter-date-to" class="form-input" style="width:150px" onchange="applyFilters()">
               </div>
-              <button class="btn btn-sm btn-secondary" onclick="clearDateFilter()">Limpiar filtro</button>
+              <button class="btn btn-sm btn-secondary" onclick="clearAllFilters()">Limpiar filtros</button>
             </div>
 
             <!-- Pestañas -->
@@ -606,7 +608,7 @@
   <div class="modal-overlay" id="modal-overlay">
     <div class="modal-box">
       <div class="modal-header">
-        <h4 class="modal-title" id="modal-title">Detalle del Electro</h4>
+        <h4 class="modal-title" id="modal-title">Detalle</h4>
         <button class="modal-close" onclick="closeModal()">✕</button>
       </div>
       <div class="modal-body">
