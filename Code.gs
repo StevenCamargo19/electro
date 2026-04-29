@@ -611,11 +611,22 @@ function handleGetSurveys(data) {
     }
 
     var totalResp = 0;
-    var yaRespondio = false;
+    var respuestaHoy = false;
+    var tz = 'America/Bogota';
+    var hoy = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy');
+    
     for (var j = 1; j < respRows.length; j++) {
       if (respRows[j][1] === row[0]) {
         totalResp++;
-        if (respRows[j][2] === username) yaRespondio = true;
+        if (respRows[j][2] === username) {
+          var fechaResp = respRows[j][3];
+          if (fechaResp instanceof Date) {
+            fechaResp = Utilities.formatDate(fechaResp, tz, 'dd/MM/yyyy hh:mm:ss a');
+          }
+          if (fechaResp && fechaResp.substring(0, 10) === hoy) {
+            respuestaHoy = true;
+          }
+        }
       }
     }
 
@@ -628,7 +639,7 @@ function handleGetSurveys(data) {
       fechaCreacion: fechaStr,
       activa: activa,
       totalRespuestas: totalResp,
-      yaRespondio: yaRespondio,
+      respuestaHoy: respuestaHoy,
       rowIndex: i + 1
     });
   }
@@ -648,11 +659,19 @@ function handleSubmitSurveyResponse(data) {
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet = ensureSheet(ss, 'Respuestas', ['id','encuestaId','respondidoPor','fechaRespuesta','respuestas']);
 
-  // Verificar si ya respondio
+  // Verificar si ya respondio hoy
+  var tz = 'America/Bogota';
+  var hoy = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy');
   var rows = sheet.getDataRange().getValues();
   for (var i = 1; i < rows.length; i++) {
     if (rows[i][1] === encuestaId && rows[i][2] === respondidoPor) {
-      return { success: false, message: 'Ya respondiste esta encuesta' };
+      var fechaResp = rows[i][3];
+      if (fechaResp instanceof Date) {
+        fechaResp = Utilities.formatDate(fechaResp, tz, 'dd/MM/yyyy hh:mm:ss a');
+      }
+      if (fechaResp && fechaResp.substring(0, 10) === hoy) {
+        return { success: false, message: 'Ya respondiste esta encuesta hoy' };
+      }
     }
   }
 

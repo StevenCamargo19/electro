@@ -1938,10 +1938,24 @@ function clearDateFilter() {
 
 function parseDate(dateStr) {
   if (!dateStr) return null;
+  // Formato: dd/MM/yyyy hh:mm:ss a
   const parts = dateStr.split(' ');
+  if (parts.length < 2) return null;
+
   const dateParts = parts[0].split('/');
   if (dateParts.length !== 3) return null;
-  return new Date(dateParts[2], dateParts[1] - 1, dateParts[0]);
+
+  const timeParts = parts[1].split(':');
+  const hour = parseInt(timeParts[0]) || 0;
+  const minute = parseInt(timeParts[1]) || 0;
+  const second = parseInt(timeParts[2]) || 0;
+  const ampm = parts[2] ? parts[2].toLowerCase() : '';
+
+  let hour24 = hour;
+  if (ampm === 'pm' && hour !== 12) hour24 = hour + 12;
+  if (ampm === 'am' && hour === 12) hour24 = 0;
+
+  return new Date(dateParts[2], dateParts[1] - 1, dateParts[0], hour24, minute, second);
 }
 
 function renderResponsesTable(responses, survey) {
@@ -2127,10 +2141,19 @@ let currentEnfSurvey = null;
 let enfSurveyResponses = {};
 
 function loadEnfSurveys() {
+  const container = document.getElementById('enf-surveys-cards');
+  container.innerHTML = '<div class="surveys-empty"><div class="empty-icon">⏳</div><div class="empty-title">Cargando encuestas...</div></div>';
+
   apiCall({ action: 'getSurveys', rol: currentUser.rol, username: currentUser.username })
     .then(res => {
       if (res.success) renderEnfSurveysList(res.surveys);
-      else toast('Error al cargar encuestas', 'error');
+      else {
+        container.innerHTML = '<div class="surveys-empty"><div class="empty-icon">❌</div><div class="empty-title">Error al cargar encuestas</div></div>';
+        toast('Error al cargar encuestas', 'error');
+      }
+    })
+    .catch(() => {
+      container.innerHTML = '<div class="surveys-empty"><div class="empty-icon">❌</div><div class="empty-title">Error de conexión</div></div>';
     });
 }
 
@@ -2145,6 +2168,13 @@ function renderEnfSurveysList(surveys) {
     return;
   }
 
+  // Ordenar de más reciente a más antigua
+  activeSurveys.sort((a, b) => {
+    const dateA = parseDate(a.fechaCreacion) || new Date(0);
+    const dateB = parseDate(b.fechaCreacion) || new Date(0);
+    return dateB - dateA;
+  });
+
   container.innerHTML = activeSurveys.map(s => {
     const badgeClass = s.respuestaHoy ? 'survey-completed' : 'survey-pending';
     const badgeText = s.respuestaHoy ? 'Respondida hoy' : 'Pendiente';
@@ -2155,8 +2185,11 @@ function renderEnfSurveysList(surveys) {
         <span class="survey-badge ${badgeClass}">${badgeText}</span>
       </div>
       <p class="survey-desc">${s.descripcion || ''}</p>
-      <div class="survey-meta">Creada: ${s.fechaCreacion} · ${s.totalRespuestas || 0} respuestas</div>
-      <button class="btn btn-primary" onclick="openEnfSurveyForm('${s.id}')">${s.respuestaHoy ? '📝 Volver a responder' : '📝 Responder Encuesta'}</button>
+      <div class="survey-meta">Creada: ${s.fechaCreacion}</div>
+      ${s.respuestaHoy ?
+        '<button class="btn btn-secondary" disabled style="opacity:0.6;cursor:not-allowed">✅ Ya respondida hoy</button>' :
+        `<button class="btn btn-primary" onclick="openEnfSurveyForm('${s.id}')">📝 Responder Encuesta</button>`
+      }
     </div>
   `}).join('');
 }
