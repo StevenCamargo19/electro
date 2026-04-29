@@ -1535,6 +1535,8 @@ function populateEnfermeroFilter(records) {
 
 let currentSurvey = null;
 let surveyQuestions = [];
+let currentSurveyRespData = [];
+let currentSurveyRespId = null;
 
 // ═══════════════════════════════════════════════════════════════
 // SUPERVISOR — Encuestas
@@ -1852,18 +1854,25 @@ function viewSurveyResponses(id) {
       document.getElementById('sup-survey-form').style.display = 'none';
       document.getElementById('sup-survey-responses').style.display = 'block';
 
+      currentSurveyRespId = id;
       loadSurveyResponses(id, s);
     });
 }
 
 async function loadSurveyResponses(id, survey) {
+  currentSurveyRespId = id;
+  document.getElementById('responses-table-body').innerHTML = '<tr><td colspan="3" class="loading-row">Cargando respuestas...</td></tr>';
+
   try {
     const res = await apiCall({ action: 'getSurveyResponses', encuestaId: id });
-    if (res.success) {
-      renderResponsesTable(res.responses, survey);
+    if (res.success && currentSurveyRespId === id) {
+      currentSurveyRespData = res.responses || [];
+      renderResponsesTable(currentSurveyRespData, survey);
     }
   } catch (e) {
-    toast('Error de conexión', 'error');
+    if (currentSurveyRespId === id) {
+      toast('Error de conexión', 'error');
+    }
   }
 }
 
@@ -1891,22 +1900,8 @@ function renderResponsesTable(responses, survey) {
 }
 
 function viewResponseDetail(id) {
-  const tbody = document.getElementById('responses-table-body');
-  const rows = tbody.querySelectorAll('tr');
-  let response = null;
-  
-  for (let row of rows) {
-    const btn = row.querySelector('button');
-    if (btn && btn.onclick.toString().includes(id)) {
-      const cells = row.querySelectorAll('td');
-      if (cells.length >= 2) {
-        const responses = currentSurveyRespData;
-        response = responses.find(r => r.id === id);
-        break;
-      }
-    }
-  }
-  
+  const response = currentSurveyRespData.find(r => r.id === id);
+
   if (!response) {
     toast('Respuesta no encontrada', 'error');
     return;
@@ -1935,13 +1930,27 @@ function viewResponseDetail(id) {
     }
   }
   
-  html += `<button class="btn btn-secondary" onclick="this.closest('.modal-box')?.remove();document.getElementById('modal-overlay')?.remove();" style="margin-top:16px">Cerrar</button></div>`;
+  //html += `<button class="btn btn-secondary" onclick="closeModal()" style="margin-top:16px">Cerrar</button></div>`;
   
   showModal(html);
 }
 
 function showModal(content) {
-  const modal = document.getElementById('modal-overlay');
+  let modal = document.getElementById('modal-overlay');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-box">
+        <div class="modal-header">
+          <h4 class="modal-title" id="modal-title">Detalle</h4>
+          <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body"></div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
   const body = modal.querySelector('.modal-body');
   body.innerHTML = content;
   modal.classList.add('open');
@@ -1951,30 +1960,7 @@ function backToSurveyAdmin() {
   currentSurvey = null;
   surveyQuestions = [];
   currentSurveyRespData = [];
-  document.getElementById('sup-survey-form').style.display = 'none';
-  document.getElementById('sup-survey-responses').style.display = 'none';
-  document.getElementById('sup-surveys-list').style.display = 'block';
-  loadSurveys();
-}
-
-let currentSurveyRespData = [];
-
-async function loadSurveyResponses(id, survey) {
-  try {
-    const res = await apiCall({ action: 'getSurveyResponses', encuestaId: id });
-    if (res.success) {
-      currentSurveyRespData = res.responses || [];
-      renderResponsesTable(currentSurveyRespData, survey);
-    }
-  } catch (e) {
-    toast('Error de conexión', 'error');
-  }
-}
-
-function backToSurveyAdmin() {
-  currentSurvey = null;
-  surveyQuestions = [];
-  currentSurveyRespData = [];
+  currentSurveyRespId = null;
   document.getElementById('sup-survey-form').style.display = 'none';
   document.getElementById('sup-survey-responses').style.display = 'none';
   document.getElementById('sup-surveys-list').style.display = 'block';
