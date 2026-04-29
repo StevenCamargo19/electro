@@ -1541,6 +1541,8 @@ let currentSurveyForReport = null;
 let filteredResponses = [];
 let dateFilterFrom = null;
 let dateFilterTo = null;
+let surveyDaily = true;
+let allSurveysData = [];
 
 // ═══════════════════════════════════════════════════════════════
 // SUPERVISOR — Encuestas
@@ -1548,9 +1550,40 @@ let dateFilterTo = null;
 function loadSurveys() {
   apiCall({ action: 'getSurveys', rol: currentUser.rol, username: currentUser.username })
     .then(res => {
-      if (res.success) renderSurveysTable(res.surveys);
-      else toast('Error al cargar encuestas', 'error');
+      if (res.success) {
+        allSurveysData = res.surveys || [];
+        filterAndSortSurveys();
+      } else {
+        toast('Error al cargar encuestas', 'error');
+      }
     });
+}
+
+function filterAndSortSurveys() {
+  const filterName = document.getElementById('survey-filter-name').value.toLowerCase();
+  const sortOrder = document.getElementById('survey-sort-order').value;
+
+  let filtered = [...allSurveysData];
+
+  // Filtrar por nombre
+  if (filterName) {
+    filtered = filtered.filter(s => s.titulo.toLowerCase().includes(filterName));
+  }
+
+  // Ordenar por fecha
+  filtered.sort((a, b) => {
+    const dateA = parseDate(a.fechaCreacion) || new Date(0);
+    const dateB = parseDate(b.fechaCreacion) || new Date(0);
+    return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+  });
+
+  renderSurveysTable(filtered);
+}
+
+function clearSurveyFilters() {
+  document.getElementById('survey-filter-name').value = '';
+  document.getElementById('survey-sort-order').value = 'desc';
+  filterAndSortSurveys();
 }
 
 function renderSurveysTable(surveys) {
@@ -1563,7 +1596,6 @@ function renderSurveysTable(surveys) {
   }
 
   tbody.innerHTML = surveys.map(s => {
-    const activa = s.activa ? 'SI' : 'NO';
     return `<tr>
       <td><strong>${s.titulo}</strong></td>
       <td>${s.creadaPor}</td>
@@ -1573,7 +1605,10 @@ function renderSurveysTable(surveys) {
       <td>
         <button type="button" class="btn btn-sm btn-teal-outline" data-action="edit" data-id="${s.id}">✏️ Editar</button>
         <button type="button" class="btn btn-sm btn-secondary" data-action="responses" data-id="${s.id}">📋 Respuestas</button>
-        <button type="button" class="btn btn-sm btn-danger-outline" data-action="delete" data-id="${s.id}">🗑️ Eliminar</button>
+        ${s.activa ?
+          `<button type="button" class="btn btn-sm btn-danger-outline" data-action="finalize" data-id="${s.id}">🛑 Finalizar</button>` :
+          `<button type="button" class="btn btn-sm btn-teal-outline" data-action="activate" data-id="${s.id}">✅ Activar</button>`
+        }
       </td>
     </tr>`;
   }).join('');
@@ -1587,9 +1622,42 @@ function renderSurveysTable(surveys) {
       const id = e.target.dataset.id;
       if (action === 'edit') editSurvey(id);
       else if (action === 'responses') viewSurveyResponses(id);
-      else if (action === 'delete') showConfirmModal('¿Estás seguro de eliminar esta encuesta? Se perderán todas las respuestas.', () => doDeleteDirect(id));
+      else if (action === 'finalize') finalizeSurvey(id);
+      else if (action === 'activate') activateSurvey(id);
     };
   });
+}
+
+function finalizeSurvey(id) {
+  showConfirmModal('¿Estás seguro de finalizar esta encuesta? Se ocultará a los enfermeros.', () => {
+    showLoading('Finalizando...');
+    apiCall({ action: 'toggleSurvey', id: id, activa: false })
+      .then(res => {
+        if (res.success) {
+          toast('✅ Encuesta finalizada', 'success');
+          loadSurveys();
+        } else {
+          toast(res.message || 'Error al finalizar', 'error');
+        }
+      })
+      .catch(() => toast('Error de conexión', 'error'))
+      .finally(() => hideLoading());
+  });
+}
+
+function activateSurvey(id) {
+  showLoading('Activando...');
+  apiCall({ action: 'toggleSurvey', id: id, activa: true })
+    .then(res => {
+      if (res.success) {
+        toast('✅ Encuesta activada', 'success');
+        loadSurveys();
+      } else {
+        toast(res.message || 'Error al activar', 'error');
+      }
+    })
+    .catch(() => toast('Error de conexión', 'error'))
+    .finally(() => hideLoading());
 }
 
 function showConfirmModal(message, onConfirm) {
@@ -1607,57 +1675,17 @@ function closeConfirmModal() {
   document.getElementById('confirm-modal').classList.remove('open');
 }
 
-function doDeleteDirect(id) {
-  showLoading('Eliminando...');
-
-  fetch(API_URL, {
-    method: 'POST',
-    body: JSON.stringify({ action: 'deleteSurvey', id: id })
-  })
-    .then(r => r.json())
-    .then(res => {
-      if (res.success) {
-        toast('✅ Encuesta eliminada', 'success');
-        loadSurveys();
-      } else {
-        toast(res.message || 'Error al eliminar', 'error');
-      }
-    })
-    .catch(err => {
-      toast('Error de conexión', 'error');
-    })
-    .finally(() => {
-      hideLoading();
-    });
-}
-
-function confirmDeleteSurvey(id) {
-  if (!confirm('¿Estás seguro de eliminar esta encuesta? Se perderán todas las respuestas.')) return;
-
-  showLoading('Eliminando...');
-  try {
-    const res = apiCall({ action: 'deleteSurvey', id });
-    res.then(r => {
-      if (r.success) {
-        toast('✅ Encuesta eliminada', 'success');
-        loadSurveys();
-      } else {
-        toast(r.message || 'Error al eliminar', 'error');
-      }
-    });
-  } catch (e) {
-    console.error('Delete error:', e);
-    toast('Error de conexión', 'error');
-  } finally {
-    hideLoading();
-  }
+function updateDailyOption() {
+  surveyDaily = document.getElementById('survey-daily').checked;
 }
 
 function showCreateSurvey() {
   currentSurvey = null;
   surveyQuestions = [];
+  surveyDaily = true;
   document.getElementById('survey-titulo').value = '';
   document.getElementById('survey-desc').value = '';
+  document.getElementById('survey-daily').checked = true;
   document.getElementById('survey-questions-builder').innerHTML = '';
   addQuestion();
   document.getElementById('sup-surveys-list').style.display = 'none';
@@ -1757,6 +1785,7 @@ function updateQuestion(idx, field, value) {
 async function saveSurvey() {
   const titulo = document.getElementById('survey-titulo').value.trim();
   const descripcion = document.getElementById('survey-desc').value.trim();
+  surveyDaily = document.getElementById('survey-daily').checked;
 
   if (!titulo) {
     toast('El título es obligatorio', 'error');
@@ -1778,7 +1807,8 @@ async function saveSurvey() {
         id: currentSurvey.id,
         titulo,
         descripcion,
-        preguntas: validQuestions
+        preguntas: validQuestions,
+        mostrarDiariamente: surveyDaily
       });
     } else {
       res = await apiCall({
@@ -1786,7 +1816,8 @@ async function saveSurvey() {
         titulo,
         descripcion,
         preguntas: validQuestions,
-        creadaPor: currentUser.username
+        creadaPor: currentUser.username,
+        mostrarDiariamente: surveyDaily
       });
     }
 
@@ -1813,8 +1844,10 @@ function editSurvey(id) {
 
       currentSurvey = s;
       surveyQuestions = s.preguntas || [];
+      surveyDaily = s.mostrarDiariamente !== false;
       document.getElementById('survey-titulo').value = s.titulo;
       document.getElementById('survey-desc').value = s.descripcion || '';
+      document.getElementById('survey-daily').checked = surveyDaily;
       renderQuestionsBuilder();
       document.getElementById('sup-surveys-list').style.display = 'none';
       document.getElementById('sup-survey-form').style.display = 'block';

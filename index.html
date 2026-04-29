@@ -458,6 +458,16 @@
               </div>
               <button class="btn btn-primary" onclick="showCreateSurvey()">➕ Nueva Encuesta</button>
             </div>
+            <!-- Filtros y ordenamiento -->
+            <div style="display:flex;gap:12px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
+              <input type="text" id="survey-filter-name" class="form-input" style="width:250px" placeholder="🔍 Filtrar por nombre..."
+                oninput="filterAndSortSurveys()">
+              <select id="survey-sort-order" class="form-input" style="width:200px" onchange="filterAndSortSurveys()">
+                <option value="desc">Más reciente a más antigua</option>
+                <option value="asc">Más antigua a más reciente</option>
+              </select>
+              <button class="btn btn-sm btn-secondary" onclick="clearSurveyFilters()">Limpiar filtros</button>
+            </div>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -500,6 +510,15 @@
               <div id="survey-questions-builder"></div>
               <button class="btn btn-sm btn-teal-outline" onclick="addQuestion()" style="margin:12px 0">➕ Agregar
                 Pregunta</button>
+              <div class="form-field" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+                  <input type="checkbox" id="survey-daily" checked onchange="updateDailyOption()">
+                  <span>📅 Mostrar diariamente (se muestra cada día)</span>
+                </label>
+                <p style="font-size:11px;color:var(--text-2);margin-top:4px;margin-left:24px">
+                  Si no está marcada, la encuesta solo se mostrará una vez hasta que el enfermero la responda.
+                </p>
+              </div>
               <div class="form-actions">
                 <button class="btn btn-primary" onclick="saveSurvey()">💾 Guardar Encuesta</button>
                 <button class="btn btn-secondary" onclick="backToSurveyAdmin()">Cancelar</button>

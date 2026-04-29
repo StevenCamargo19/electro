@@ -566,19 +566,20 @@ function handleCreateSurvey(data) {
   var descripcion = data.descripcion || '';
   var preguntas = data.preguntas;
   var creadaPor = data.creadaPor;
+  var mostrarDiariamente = data.mostrarDiariamente !== false;
 
   if (!titulo || !preguntas || !creadaPor) {
     return { success: false, message: 'Campos obligatorios faltantes' };
   }
 
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  var sheet = ensureSheet(ss, 'Encuestas', ['id','titulo','descripcion','preguntas','creadaPor','fechaCreacion','activa']);
+  var sheet = ensureSheet(ss, 'Encuestas', ['id','titulo','descripcion','preguntas','creadaPor','fechaCreacion','activa','mostrarDiariamente']);
 
   var tz = 'America/Bogota';
   var id = Utilities.getUuid();
   var fechaCreacion = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy hh:mm:ss a');
 
-  sheet.appendRow([id, titulo, descripcion, JSON.stringify(preguntas), creadaPor, fechaCreacion, 'SI']);
+  sheet.appendRow([id, titulo, descripcion, JSON.stringify(preguntas), creadaPor, fechaCreacion, 'SI', mostrarDiariamente ? 'SI' : 'NO']);
 
   return { success: true, message: 'Encuesta creada correctamente' };
 }
@@ -601,6 +602,7 @@ function handleGetSurveys(data) {
     if (row[0] === '') continue;
 
     var activa = row[6] === 'SI';
+    var mostrarDiariamente = row[7] === undefined ? true : row[7] === 'SI';
 
     // Enfermeros solo ven encuestas activas
     if (rol === 'enfermero' && !activa) continue;
@@ -612,6 +614,7 @@ function handleGetSurveys(data) {
 
     var totalResp = 0;
     var respuestaHoy = false;
+    var yaRespondioAlgunaVez = false;
     var tz = 'America/Bogota';
     var hoy = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy');
     
@@ -619,6 +622,7 @@ function handleGetSurveys(data) {
       if (respRows[j][1] === row[0]) {
         totalResp++;
         if (respRows[j][2] === username) {
+          yaRespondioAlgunaVez = true;
           var fechaResp = respRows[j][3];
           if (fechaResp instanceof Date) {
             fechaResp = Utilities.formatDate(fechaResp, tz, 'dd/MM/yyyy hh:mm:ss a');
@@ -630,6 +634,11 @@ function handleGetSurveys(data) {
       }
     }
 
+    // Para encuestas no diarias, si ya respondió alguna vez, no mostrar
+    if (rol === 'enfermero' && !mostrarDiariamente && yaRespondioAlgunaVez) {
+      continue;
+    }
+
     surveys.push({
       id: row[0],
       titulo: row[1],
@@ -638,6 +647,7 @@ function handleGetSurveys(data) {
       creadaPor: row[4],
       fechaCreacion: fechaStr,
       activa: activa,
+      mostrarDiariamente: mostrarDiariamente,
       totalRespuestas: totalResp,
       respuestaHoy: respuestaHoy,
       rowIndex: i + 1
@@ -715,48 +725,25 @@ function handleGetSurveyResponses(data) {
 }
 
 function handleToggleSurvey(data) {
-  var rowIndex = data.rowIndex;
+  var id = data.id;
   var activa = data.activa;
 
-  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  var sheet = ss.getSheetByName('Encuestas');
-  sheet.getRange(rowIndex, 7).setValue(activa ? 'SI' : 'NO');
-
-  return { success: true, message: activa ? 'Encuesta activada' : 'Encuesta desactivada' };
-}
-
-function handleDeleteSurvey(data) {
-  var id = data.id;
-  var debugLog = [];
-  
-  debugLog.push('handleDeleteSurvey called with id: ' + id);
-  
-  if (!id) return { success: false, message: 'ID no proporcionado', debug: debugLog };
-  
-  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  var sheet = ss.getSheetByName('Encuestas');
-
-  if (!sheet) {
-    debugLog.push('ERROR: Sheet Encuestas not found');
-    return { success: false, message: 'Hoja no encontrada', debug: debugLog };
+  if (!id) {
+    return { success: false, message: 'ID no proporcionado' };
   }
 
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName('Encuestas');
   var rows = sheet.getDataRange().getValues();
-  debugLog.push('Total rows in Encuestas: ' + rows.length);
-  debugLog.push('Looking for ID: ' + id);
-  
+
   for (var i = 1; i < rows.length; i++) {
-    var rowId = String(rows[i][0]);
-    debugLog.push('Row ' + i + ': "' + rowId + '" === "' + id + '" = ' + (rowId === id));
-    if (rowId === id) {
-      debugLog.push('FOUND! Deleting row ' + (i + 1));
-      sheet.deleteRow(i + 1);
-      return { success: true, message: 'Encuesta eliminada', debug: debugLog };
+    if (rows[i][0] === id) {
+      sheet.getRange(i + 1, 7).setValue(activa ? 'SI' : 'NO');
+      return { success: true, message: activa ? 'Encuesta activada' : 'Encuesta desactivada' };
     }
   }
 
-  debugLog.push('NOT FOUND - ID does not match any row');
-  return { success: false, message: 'Encuesta no encontrada', debug: debugLog };
+  return { success: false, message: 'Encuesta no encontrada' };
 }
 
 function handleUpdateSurvey(data) {
@@ -764,6 +751,7 @@ function handleUpdateSurvey(data) {
   var titulo = data.titulo;
   var descripcion = data.descripcion || '';
   var preguntas = data.preguntas;
+  var mostrarDiariamente = data.mostrarDiariamente !== false;
 
   if (!id || !titulo || !preguntas) {
     return { success: false, message: 'Campos obligatorios faltantes' };
@@ -778,6 +766,7 @@ function handleUpdateSurvey(data) {
       sheet.getRange(i + 1, 2).setValue(titulo);
       sheet.getRange(i + 1, 3).setValue(descripcion);
       sheet.getRange(i + 1, 4).setValue(JSON.stringify(preguntas));
+      sheet.getRange(i + 1, 8).setValue(mostrarDiariamente ? 'SI' : 'NO');
       return { success: true, message: 'Encuesta actualizada' };
     }
   }
