@@ -1537,6 +1537,10 @@ let currentSurvey = null;
 let surveyQuestions = [];
 let currentSurveyRespData = [];
 let currentSurveyRespId = null;
+let currentSurveyForReport = null;
+let filteredResponses = [];
+let dateFilterFrom = null;
+let dateFilterTo = null;
 
 // ═══════════════════════════════════════════════════════════════
 // SUPERVISOR — Encuestas
@@ -1861,13 +1865,20 @@ function viewSurveyResponses(id) {
 
 async function loadSurveyResponses(id, survey) {
   currentSurveyRespId = id;
+  currentSurveyForReport = survey;
+  dateFilterFrom = null;
+  dateFilterTo = null;
+  document.getElementById('filter-date-from').value = '';
+  document.getElementById('filter-date-to').value = '';
   document.getElementById('responses-table-body').innerHTML = '<tr><td colspan="3" class="loading-row">Cargando respuestas...</td></tr>';
 
   try {
     const res = await apiCall({ action: 'getSurveyResponses', encuestaId: id });
     if (res.success && currentSurveyRespId === id) {
       currentSurveyRespData = res.responses || [];
-      renderResponsesTable(currentSurveyRespData, survey);
+      filteredResponses = [...currentSurveyRespData];
+      renderResponsesTable(filteredResponses, survey);
+      switchTab('responses-list');
     }
   } catch (e) {
     if (currentSurveyRespId === id) {
@@ -1876,13 +1887,72 @@ async function loadSurveyResponses(id, survey) {
   }
 }
 
+function switchTab(tabName) {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    const isActive = btn.dataset.tab === tabName;
+    btn.classList.toggle('active', isActive);
+    btn.style.color = isActive ? 'var(--teal)' : 'var(--text-2)';
+    btn.style.borderBottom = isActive ? '2px solid var(--teal)' : '2px solid transparent';
+    btn.style.marginBottom = '-2px';
+  });
+
+  document.querySelectorAll('.tab-content').forEach(content => {
+    content.style.display = 'none';
+  });
+
+  document.getElementById('tab-' + tabName).style.display = 'block';
+
+  if (tabName === 'responses-report' && currentSurveyForReport) {
+    renderSurveyReport(filteredResponses, currentSurveyForReport);
+  }
+}
+
+function applyDateFilter() {
+  const fromStr = document.getElementById('filter-date-from').value;
+  const toStr = document.getElementById('filter-date-to').value;
+
+  dateFilterFrom = fromStr ? new Date(fromStr + 'T00:00:00') : null;
+  dateFilterTo = toStr ? new Date(toStr + 'T23:59:59') : null;
+
+  filteredResponses = currentSurveyRespData.filter(r => {
+    const respDate = parseDate(r.fechaRespuesta);
+    if (!respDate) return true;
+
+    if (dateFilterFrom && respDate < dateFilterFrom) return false;
+    if (dateFilterTo && respDate > dateFilterTo) return false;
+
+    return true;
+  });
+
+  renderResponsesTable(filteredResponses, currentSurveyForReport);
+}
+
+function clearDateFilter() {
+  document.getElementById('filter-date-from').value = '';
+  document.getElementById('filter-date-to').value = '';
+  dateFilterFrom = null;
+  dateFilterTo = null;
+  filteredResponses = [...currentSurveyRespData];
+  renderResponsesTable(filteredResponses, currentSurveyForReport);
+}
+
+function parseDate(dateStr) {
+  if (!dateStr) return null;
+  const parts = dateStr.split(' ');
+  const dateParts = parts[0].split('/');
+  if (dateParts.length !== 3) return null;
+  return new Date(dateParts[2], dateParts[1] - 1, dateParts[0]);
+}
+
 function renderResponsesTable(responses, survey) {
   const tbody = document.getElementById('responses-table-body');
   const summary = document.getElementById('responses-summary');
+  const report = document.getElementById('survey-report');
 
   if (!responses.length) {
     tbody.innerHTML = '<tr><td colspan="3" class="loading-row">No hay respuestas aún</td></tr>';
     summary.innerHTML = '';
+    report.innerHTML = '';
     return;
   }
 
@@ -1897,6 +1967,85 @@ function renderResponsesTable(responses, survey) {
       <td><button class="btn btn-sm btn-secondary" onclick="viewResponseDetail('${r.id}')">🔍 Ver</button></td>
     </tr>
   `).join('');
+
+  renderSurveyReport(responses, survey);
+}
+
+function renderSurveyReport(responses, survey) {
+  const report = document.getElementById('survey-report');
+  if (!survey || !survey.preguntas || !responses.length) {
+    report.innerHTML = '';
+    return;
+  }
+
+  let html = '<div class="survey-report-container" style="margin-top:20px">';
+  html += '<h4 style="margin-bottom:16px">📈 Reporte de la Encuesta</h4>';
+
+  survey.preguntas.forEach((pregunta, idx) => {
+    const respuestasPregunta = responses
+      .map(r => {
+        let respuestasArray = [];
+        if (r.respuestas) {
+          respuestasArray = Array.isArray(r.respuestas) ? r.respuestas : JSON.parse(r.respuestas);
+        }
+        return respuestasArray.find(item => item.pregunta === pregunta.pregunta);
+      })
+      .filter(r => r && r.respuesta);
+
+    html += '<div class="report-question" style="margin-bottom:20px;padding:16px;background:var(--bg-2);border-radius:8px">';
+    html += `<div style="font-weight:600;margin-bottom:12px">${idx + 1}. ${pregunta.pregunta}</div>`;
+
+    if (!respuestasPregunta.length) {
+      html += '<div style="color:var(--text-2);font-size:13px">Sin respuestas</div>';
+    } else {
+      switch (pregunta.tipo) {
+        case 'radio':
+        case 'checkbox':
+          const conteo = {};
+          respuestasPregunta.forEach(r => {
+            const vals = Array.isArray(r.respuesta) ? r.respuesta : [r.respuesta];
+            vals.forEach(v => {
+              conteo[v] = (conteo[v] || 0) + 1;
+            });
+          });
+          html += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+          Object.entries(conteo).forEach(([opcion, count]) => {
+            const pct = ((count / respuestasPregunta.length) * 100).toFixed(1);
+            html += `<div style="padding:8px 12px;background:var(--bg-1);border-radius:6px;font-size:13px">
+              <strong>${opcion}</strong>: ${count} (${pct}%)
+            </div>`;
+          });
+          html += '</div>';
+          break;
+
+        case 'numero':
+          const nums = respuestasPregunta.map(r => parseFloat(r.respuesta)).filter(n => !isNaN(n));
+          if (nums.length) {
+            const min = Math.min(...nums);
+            const max = Math.max(...nums);
+            const avg = (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2);
+            html += `<div style="display:flex;gap:16px;font-size:13px">
+              <span>Min: <strong>${min}</strong></span>
+              <span>Max: <strong>${max}</strong></span>
+              <span>Promedio: <strong>${avg}</strong></span>
+            </div>`;
+          }
+          break;
+
+        case 'texto':
+        case 'textarea':
+          html += `<div style="font-size:13px;color:var(--text-2)">
+            ${respuestasPregunta.length} respuesta(s) de texto
+          </div>`;
+          break;
+      }
+    }
+
+    html += '</div>';
+  });
+
+  html += '</div>';
+  report.innerHTML = html;
 }
 
 function viewResponseDetail(id) {
@@ -1961,6 +2110,10 @@ function backToSurveyAdmin() {
   surveyQuestions = [];
   currentSurveyRespData = [];
   currentSurveyRespId = null;
+  currentSurveyForReport = null;
+  filteredResponses = [];
+  dateFilterFrom = null;
+  dateFilterTo = null;
   document.getElementById('sup-survey-form').style.display = 'none';
   document.getElementById('sup-survey-responses').style.display = 'none';
   document.getElementById('sup-surveys-list').style.display = 'block';

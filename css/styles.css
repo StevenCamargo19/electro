@@ -1454,6 +1454,49 @@ tbody tr:hover {
   background: #ce93d8;
 }
 
+/* Survey report */
+.survey-report-container {
+  animation: fadeUp 0.3s ease;
+}
+
+.survey-report-container h4 {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.report-question {
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+.report-question:hover {
+  border-color: var(--teal);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Tabs */
+.tabs {
+  margin-top: 16px;
+}
+
+.tab-btn {
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent !important;
+}
+
+.tab-btn:hover {
+  color: var(--teal) !important;
+}
+
+.tab-btn.active {
+  color: var(--teal) !important;
+  border-bottom: 2px solid var(--teal) !important;
+}
+
+.tab-content {
+  animation: fadeUp 0.3s ease;
+}
+
 /* Date range inputs */
 .date-range-group {
   display: flex;

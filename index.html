@@ -513,18 +513,50 @@
               Volver</button>
             <h3 class="section-title" id="responses-survey-title"></h3>
             <p class="section-desc" id="responses-survey-desc"></p>
-            <div id="responses-summary"></div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Respondido por</th>
-                    <th>Fecha</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody id="responses-table-body"></tbody>
-              </table>
+
+            <!-- Filtro de fechas -->
+            <div class="date-filter" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+              <div class="date-range-group">
+                <label style="font-size:13px;color:var(--text-2)">Desde:</label>
+                <input type="date" id="filter-date-from" class="form-input" style="width:150px" onchange="applyDateFilter()">
+              </div>
+              <div class="date-range-group">
+                <label style="font-size:13px;color:var(--text-2)">Hasta:</label>
+                <input type="date" id="filter-date-to" class="form-input" style="width:150px" onchange="applyDateFilter()">
+              </div>
+              <button class="btn btn-sm btn-secondary" onclick="clearDateFilter()">Limpiar filtro</button>
+            </div>
+
+            <!-- Pestañas -->
+            <div class="tabs" style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border)">
+              <button class="tab-btn active" data-tab="responses-list" onclick="switchTab('responses-list')" style="padding:10px 20px;background:none;border:none;cursor:pointer;font-size:14px;font-weight:500;color:var(--teal);border-bottom:2px solid var(--teal);margin-bottom:-2px">
+                📋 Lista de respuestas
+              </button>
+              <button class="tab-btn" data-tab="responses-report" onclick="switchTab('responses-report')" style="padding:10px 20px;background:none;border:none;cursor:pointer;font-size:14px;font-weight:500;color:var(--text-2)">
+                📈 Reporte
+              </button>
+            </div>
+
+            <!-- Contenido de pestaña: Lista -->
+            <div id="tab-responses-list" class="tab-content">
+              <div id="responses-summary"></div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Respondido por</th>
+                      <th>Fecha</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="responses-table-body"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Contenido de pestaña: Reporte -->
+            <div id="tab-responses-report" class="tab-content" style="display:none">
+              <div id="survey-report"></div>
             </div>
           </div>
         </div>
